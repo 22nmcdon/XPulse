@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="Y1Zvqw" name="XPulse" projectType="audioplug" useAppConfig="0"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginFormats="buildAU,buildVST3"
+              pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn"
+              defines="JUCE_PLUGINHOST_VST3=1">
+  <MAINGROUP id="mRjcMg" name="XPulse">
+    <GROUP id="{AA115B7E-3C34-147D-B326-5D68438A938A}" name="Source">
+      <GROUP id="{111B6488-9EF1-624A-B302-3C0444F545AD}" name="PitchDependentFX">
+        <FILE id="LNsC3e" name="PitchDependentFXContent.cpp" compile="1" resource="0"
+              file="Source/PitchDependentFXContent.cpp"/>
+        <FILE id="MZee2r" name="PitchDependentFXContent.h" compile="0" resource="0"
+              file="Source/PitchDependentFXContent.h"/>
+        <FILE id="eRcGHO" name="PitchDependentFXEditor.cpp" compile="1" resource="0"
+              file="Source/PitchDependentFXEditor.cpp"/>
+        <FILE id="eeaL79" name="PitchDependentFXEditor.h" compile="0" resource="0"
+              file="Source/PitchDependentFXEditor.h"/>
+      </GROUP>
+      <GROUP id="{F7EA272A-6CE5-7583-3181-BAC8C8A7CC92}" name="SpectralMorphFX">
+        <FILE id="Qm6ej0" name="SpectralMorphFXContent.cpp" compile="1" resource="0"
+              file="Source/SpectralMorphFXContent.cpp"/>
+        <FILE id="zoIFJq" name="SpectralMorphFXContent.h" compile="0" resource="0"
+              file="Source/SpectralMorphFXContent.h"/>
+        <FILE id="QPcawR" name="SpectralMorphFXEditor.cpp" compile="1" resource="0"
+              file="Source/SpectralMorphFXEditor.cpp"/>
+        <FILE id="NPiDvA" name="SpectralMorphFXEditor.h" compile="0" resource="0"
+              file="Source/SpectralMorphFXEditor.h"/>
+      </GROUP>
+      <GROUP id="{58D91B3D-E211-0645-57F0-A0B93C910BDD}" name="TextureBlendFX">
+        <FILE id="PXVTVX" name="TextureBlendFXContent.cpp" compile="1" resource="0"
+              file="Source/TextureBlendFXContent.cpp"/>
+        <FILE id="a489Ay" name="TextureBlendFXContent.h" compile="0" resource="0"
+              file="Source/TextureBlendFXContent.h"/>
+        <FILE id="rdXJbQ" name="TextureBlendFXEditor.cpp" compile="1" resource="0"
+              file="Source/TextureBlendFXEditor.cpp"/>
+        <FILE id="BUWfAa" name="TextureBlendFXEditor.h" compile="0" resource="0"
+              file="Source/TextureBlendFXEditor.h"/>
+      </GROUP>
+      <GROUP id="{8E77086F-9C2C-3C02-C096-EB71E8FC6A63}" name="PerformanceFX">
+        <FILE id="SAfHIv" name="PerformanceFXContent.cpp" compile="1" resource="0"
+              file="Source/PerformanceFXContent.cpp"/>
+        <FILE id="VixJyD" name="PerformanceFXContent.h" compile="0" resource="0"
+              file="Source/PerformanceFXContent.h"/>
+        <FILE id="ftWOoP" name="PerformanceFXEditor.cpp" compile="1" resource="0"
+              file="Source/PerformanceFXEditor.cpp"/>
+        <FILE id="i2dB13" name="PerformanceFXEditor.h" compile="0" resource="0"
+              file="Source/PerformanceFXEditor.h"/>
+      </GROUP>
+      <GROUP id="{F9B23E81-F4D6-1284-69C7-60168F7311AF}" name="Band Processing">
+        <FILE id="VDqR42" name="LowBandWindow.h" compile="0" resource="0" file="Source/LowBandWindow.h"/>
+        <FILE id="vzQ5nW" name="MidBandWindow.cpp" compile="1" resource="0"
+              file="Source/MidBandWindow.cpp"/>
+        <FILE id="gXI4Ky" name="MidBandWindow.h" compile="0" resource="0" file="Source/MidBandWindow.h"/>
+        <FILE id="B167Q7" name="LowBandWindow.cpp" compile="1" resource="0"
+              file="Source/LowBandWindow.cpp"/>
+        <FILE id="tFIq1L" name="HighBandWindow.h" compile="0" resource="0"
+              file="Source/HighBandWindow.h"/>
+        <FILE id="E8XpPl" name="HighBandWindow.cpp" compile="1" resource="0"
+              file="Source/HighBandWindow.cpp"/>
+      </GROUP>
+      <FILE id="UJa4Z5" name="HostProcessor.cpp" compile="1" resource="0"
+            file="Source/HostProcessor.cpp"/>
+      <FILE id="KJp8N6" name="HostProcessor.h" compile="0" resource="0" file="Source/HostProcessor.h"/>
+      <FILE id="NKzO6H" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="kVWPTT" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
+      <FILE id="Nbxsns" name="PluginEditor.cpp" compile="1" resource="0"
+            file="Source/PluginEditor.cpp"/>
+      <FILE id="sgGB4V" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+    </GROUP>
+  </MAINGROUP>
+  <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
+  <EXPORTFORMATS>
+    <VS2022 targetFolder="Builds/VisualStudio2022">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="XPulse"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="XPulse"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JuceF/juce-8.0.9-windows/JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2022>
+  </EXPORTFORMATS>
+</JUCERPROJECT>

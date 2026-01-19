@@ -1,0 +1,23 @@
+# Visual Studio
+.vs/
+*.VC.db
+*.VC.opendb
+*.suo
+
+# Build outputs
+x64/
+Debug/
+Release/
+Builds/**/x64/
+Builds/**/Win32/
+Builds/**/Debug/
+Builds/**/Release/
+
+# Generated JUCE files
+JuceLibraryCode/
+
+# Plugin binaries
+*.vst3
+*.exe
+*.dll
+*.pdb
