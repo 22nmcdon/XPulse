@@ -19,25 +19,25 @@ LowBandWindow::LowBandWindow(XPulseAudioProcessor& processorRef, juce::AudioProc
 	// Attach ComboBox to the APVTS parameter
 	lowReverbBoxAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "lowReverbPreset", lowReverbBox);
 
-	// Reverb Slider Listener
-    lowBandReverbSlider.onValueChange = [this, &processorRef]()
-        {
-            float master = lowBandReverbSlider.getValue();
-            processorRef.lowBandReverbParameters.wetLevel = processorRef.lowBaseWetLevel * master;
-            processorRef.lowBandReverbParameters.damping = processorRef.lowBaseDamping * master;
-            processorRef.lowBandReverbParameters.width = processorRef.lowBaseWidth * master;
-            processorRef.lowBandReverbParameters.roomSize = processorRef.lowBaseRoomSize;
-            processorRef.lowBandReverbParameters.dryLevel = processorRef.lowBaseDryLevel;
-            processorRef.lowBandReverbParameters.freezeMode = processorRef.lowBaseFreezeMode;
-            processorRef.lowBandReverbProcessor.setParameters(processorRef.lowBandReverbParameters);
-        };
+	//// Reverb Slider Listener
+ //   lowBandReverbSlider.onValueChange = [this, &processorRef]()
+ //       {
+ //           float master = lowBandReverbSlider.getValue();
+ //           processorRef.lowBandReverbParameters.wetLevel = processorRef.lowBaseWetLevel * master;
+ //           processorRef.lowBandReverbParameters.damping = processorRef.lowBaseDamping * master;
+ //           processorRef.lowBandReverbParameters.width = processorRef.lowBaseWidth * master;
+ //           processorRef.lowBandReverbParameters.roomSize = processorRef.lowBaseRoomSize;
+ //           processorRef.lowBandReverbParameters.dryLevel = processorRef.lowBaseDryLevel;
+ //           processorRef.lowBandReverbParameters.freezeMode = processorRef.lowBaseFreezeMode;
+ //           processorRef.lowBandReverbProcessor.setParameters(processorRef.lowBandReverbParameters);
+ //       };
 
-	// ComboBox Listener
-    lowReverbBox.onChange = [this, &processorRef]()
-       {
-           int presetIndex = lowReverbBox.getSelectedItemIndex();
-           processorRef.loadReverbPreset(presetIndex, 'l');
-		};
+	//// ComboBox Listener
+ //   lowReverbBox.onChange = [this, &processorRef]()
+ //      {
+ //          int presetIndex = lowReverbBox.getSelectedItemIndex();
+ //          processorRef.loadReverbPreset(presetIndex, 'l');
+	//	};
 
 	//Populate ComboBox with reverb presets
 	lowReverbBox.addItem("Small Room", 1);

@@ -2,125 +2,125 @@
 #include "HostProcessor.h"
 
 HostProcessor::HostProcessor()
+	: pool(formatManager)
 {
     formatManager.addDefaultFormats();
+
+    juce::PropertiesFile::Options opts;
+    opts.applicationName = "XPulse";
+    opts.filenameSuffix = "settings";
+    opts.osxLibrarySubFolder = "Application Support";
+    opts.folderName = "XPulse"; // optional on Windows
+
+    appProps.setStorageParameters(opts);
+
+    // Load cached plugin list immediately
+    if (auto* pf = appProps.getUserSettings())
+    {
+        auto xmlText = pf->getValue("KnownPluginList");
+        if (xmlText.isNotEmpty())
+        {
+            if (auto xml = juce::parseXML(xmlText))
+                knownPluginList.recreateFromXml(*xml);
+        }
+    }
+
+
+    // Start background scan (below)
+    startBackgroundScan();
 }
 
-HostProcessor::~HostProcessor() = default;
+HostProcessor::~HostProcessor() 
+{
+    if (scannerThread)
+    {
+        //Waits for run() to exit
+        scannerThread->stopThread(2000);
+        scannerThread.reset();
+    }
+}
+
 
 void HostProcessor::prepareToPlay(double sampleRate, int blockSize)
 {
     sr = sampleRate;
     bs = blockSize;
 
-    juce::CriticalSection::ScopedLockType lock(hostedLock);
-    if (hosted)
-        hosted->prepareToPlay(sr, bs);
+	pool.prepareToPlay(sr, bs);
+   
 }
 
 void HostProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    // Never block the audio thread
-    const juce::SpinLock::ScopedTryLockType lock(hostedSpinLock);
-    if (!lock.isLocked() || !hosted)
+    if (hostedInstanceId == 0)
         return;
 
-    hosted->processBlock(buffer, midi);
+    if (auto* inst = pool.getInstanceForAudio(hostedInstanceId))
+        inst->processBlock(buffer, midi);
 }
 
 void HostProcessor::unloadPlugin()
 {
-    const juce::SpinLock::ScopedLockType lock(hostedSpinLock);
-    hosted.reset();
-}
+    if (hostedInstanceId == 0)
+        return;
 
+    pool.destroyInstance(hostedInstanceId);
+    hostedInstanceId = 0;
+}
 
 void HostProcessor::loadPlugin(const juce::PluginDescription& desc)
 {
-    juce::String error;
-
-    std::unique_ptr<juce::AudioPluginInstance> instance
-        = formatManager.createPluginInstance(desc, sr, bs, error);
-
-    if (!instance)
-    {
-        // log error somewhere visible
-        return;
-    }
-
-    instance->prepareToPlay(sr, bs);
-
-    const juce::ScopedLock sl(hostedLock);
-    hosted = std::move(instance);
+    auto id = pool.createInstance(desc);
+    if (id != 0)
+        hostedInstanceId = id;
 }
 
 
-void HostProcessor::replacePlugin(const juce::PluginDescription& desc) {
-	releaseResources();
+void HostProcessor::replacePlugin(const juce::PluginDescription& desc)
+{
 	unloadPlugin();
 	loadPlugin(desc);
 }
 
 std::unique_ptr<juce::AudioProcessorEditor> HostProcessor::createHostedEditor()
 {
-    // Must be called from the UI thread
-    const juce::ScopedLock sl(hostedLock);
-
-    if (!hosted || !hosted->hasEditor())
+    // UI thread only
+    if (hostedInstanceId == 0)
         return {};
 
-    // If you use createEditorIfNeeded(), JUCE may return an existing editor.
-    // It returns a raw pointer that the processor owns, so DON'T wrap it in unique_ptr.
-    // Prefer createEditor() which gives you ownership.
-
-    return std::unique_ptr<juce::AudioProcessorEditor>(hosted->createEditor());
+    return pool.createEditorFor(hostedInstanceId);
 }
 
 void HostProcessor::releaseResources()
 {
-    const juce::ScopedLock sl(hostedLock);
-
-    if (hosted)
-        hosted->releaseResources();
+	pool.releaseResources();
 }
 
 void HostProcessor::scanForPlugins()
 {
-
-	// Will most likly be moved to a background thread in a real app
-    knownPluginList.clear();
+    juce::KnownPluginList tempList;
 
     for (auto* f : formatManager.getFormats())
         DBG("Host format available: " + f->getName());
 
-
     for (auto* format : formatManager.getFormats())
     {
-//#if defined(JUCE_WINDOWS) || defined(_WIN32) || defined(_WIN64)
-        // Only scan VST3 on Windows
-        if (format->getName() != "VST3")
+        if (!format->getName().containsIgnoreCase("vst3"))
             continue;
-//#endif
 
         juce::FileSearchPath searchPath;
-
-//#if defined(JUCE_WINDOWS) || defined(_WIN32) || defined(_WIN64)
-        // Common VST3 install locations
         searchPath.add(juce::File("C:/Program Files/Common Files/VST3"));
         searchPath.add(juce::File("C:/Program Files/VST3"));
         searchPath.add(juce::File("C:/Program Files/Steinberg/VSTPlugins"));
         searchPath.add(juce::File("C:/Program Files/VSTPlugins"));
-//#endif
 
 #if JUCE_MAC
-        // Common plugin locations on macOS (VST3 + AU components live elsewhere too)
         searchPath.add(juce::File("/Library/Audio/Plug-Ins/VST3"));
         searchPath.add(juce::File("~/Library/Audio/Plug-Ins/VST3"));
-        // AU scan is handled via AudioUnit format discovery, but including common paths doesn’t hurt
 #endif
 
         bool dontRescanIfUpToDate = true;
-        juce::PluginDirectoryScanner scanner(knownPluginList, *format, searchPath,
+        juce::PluginDirectoryScanner scanner(tempList, *format, searchPath,
             dontRescanIfUpToDate,
             juce::File(),
             true);
@@ -128,8 +128,59 @@ void HostProcessor::scanForPlugins()
         juce::String pluginBeingScanned;
         while (scanner.scanNextFile(true, pluginBeingScanned))
         {
-            // you can log pluginBeingScanned if you want
         }
+    }
 
+    auto xml = tempList.createXml();
+
+    {
+        const juce::ScopedLock sl(pluginListLock);
+        knownPluginList.clear();
+
+        if (xml)
+            knownPluginList.recreateFromXml(*xml);
     }
 }
+
+void HostProcessor::getKnownPluginTypesCopy(juce::Array<juce::PluginDescription>& out) const
+{
+    const juce::ScopedLock sl(pluginListLock);
+    out = knownPluginList.getTypes();
+}
+
+void HostProcessor::startBackgroundScan()
+{
+    scanFinished.store(false);
+
+    if (scannerThread && scannerThread->isThreadRunning())
+        return;
+
+    scannerThread = std::make_unique<ScannerThread>(*this);
+    scannerThread->startThread();
+}
+
+void HostProcessor::ScannerThread::run()
+{
+    {
+        host.scanForPlugins(); 
+    }
+
+    if (auto* pf = host.appProps.getUserSettings())
+    {
+        juce::String xmlText;
+
+        {
+            const juce::ScopedLock sl(host.pluginListLock);
+            if (auto xml = host.knownPluginList.createXml())
+                xmlText = xml->toString();
+        }
+
+        pf->setValue("KnownPluginList", xmlText);
+        pf->saveIfNeeded();
+    }
+
+
+    host.scanFinished.store(true);
+}
+
+

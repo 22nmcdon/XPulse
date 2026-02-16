@@ -20,7 +20,6 @@ public:
 	//Custom Prepare Functions
 	void prepareGainProcessor(const juce::dsp::ProcessSpec& spec);
 	void prepareBandFilters(const juce::dsp::ProcessSpec& spec);
-	void prepareReverbProcessor(const juce::dsp::ProcessSpec& spec);
 
 	//Host Processor Functions
 	HostProcessor& getHostProcessor() { return hostProcessor_; }
@@ -38,7 +37,6 @@ public:
 	void processHighBand(juce::MidiBuffer& midiMessages);
 
 	//Custom Processing Functions
-	void loadReverbPreset(int presetIndex, char band);
 	void processAudio(juce::AudioBuffer<float>& buffer);
 	void processMidi(juce::MidiBuffer& midiMessages);
     
@@ -48,19 +46,6 @@ public:
 	int midBandVelocity = 0;
 	int highBandVelocity = 0;
     
-    //Base Reverb Parameters: 0.8f, 0.5f, 0.4f, 0.8f, 1.0f, 0.0f
-    float lowBaseRoomSize = 0.8f, lowBaseDamping = 0.5f, lowBaseWetLevel = 0.4f, lowBaseDryLevel = 0.8f, lowBaseWidth = 1.0f, lowBaseFreezeMode = 0.0f;
-    float midBaseRoomSize = 0.8f, midBaseDamping = 0.5f, midBaseWetLevel = 0.4f, midBaseDryLevel = 0.8f, midBaseWidth = 1.0f, midBaseFreezeMode = 0.0f;
-    float highBaseRoomSize = 0.8f, highBaseDamping = 0.5f, highBaseWetLevel = 0.4f, highBaseDryLevel = 0.8f, highBaseWidth = 1.0f, highBaseFreezeMode = 0.0f;
-
-    //Reverb processor
-    juce::dsp::Reverb highBandReverbProcessor;
-    juce::dsp::Reverb::Parameters highBandReverbParameters;
-    juce::dsp::Reverb midBandReverbProcessor;
-    juce::dsp::Reverb::Parameters midBandReverbParameters;
-    juce::dsp::Reverb lowBandReverbProcessor;
-    juce::dsp::Reverb::Parameters lowBandReverbParameters;
-
 
     //==============================================================================
     XPulseAudioProcessor();
@@ -102,8 +87,54 @@ public:
 	// Create an instance of the Audio Processor Value Tree State(APVTS)
     juce::AudioProcessorValueTreeState parameters;
 
+	// Hosted Plugin Send Functions
+    void setBandPluginInstanceId(int band, int slot, uint32_t id)
+    {
+        if ((unsigned)band < kNumBands && (unsigned)slot < kNumSlots)
+            bandPluginInstanceId[band][slot].store(id, std::memory_order_relaxed);
+    }
+
+    void setBandSendAmount(int band, int slot, float v)
+    {
+        if ((unsigned)band < kNumBands && (unsigned)slot < kNumSlots)
+            bandSendAmount[band][slot].store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
+    }
+
+    void setBandReturnAmount(int band, int slot, float v)
+    {
+        if ((unsigned)band < kNumBands && (unsigned)slot < kNumSlots)
+            bandReturnAmount[band][slot].store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
+    }
+    
+	// Band Splitter Functions
+    void setBandSplits(float lowMidSplit, float midHighSplit);
 
 private:
+	// Default sample rate (will be updated in prepareToPlay)
+    double currentSampleRate = 44100.0;
+
+	// Function to update band filter coefficients based on current parameter values
+    void updateBandFilterCutoffs();
+
+	// Constants for band processing
+	static constexpr int kNumBands = 3; // Low, Mid, High
+	static constexpr int kNumSlots = 3;
+
+    // Hosted plugin send routing
+    std::atomic<uint32_t> bandPluginInstanceId[kNumBands][kNumSlots];
+    std::atomic<float>    bandSendAmount[kNumBands][kNumSlots]; 
+    std::atomic<float>    bandReturnAmount[kNumBands][kNumSlots];
+
+    
+    // buffers reused per block (no allocations in processBlock)
+    juce::AudioBuffer<float> lowBuffer, midBuffer, highBuffer;
+    juce::AudioBuffer<float> auxBuffer;
+
+    void processHostedSends(juce::AudioBuffer<float>& low,
+        juce::AudioBuffer<float>& mid,
+        juce::AudioBuffer<float>& high);
+
+
 	// This is a custom function to create the parameter layout for the APVTS
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 

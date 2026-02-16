@@ -21,24 +21,24 @@ MidBandWindow::MidBandWindow(XPulseAudioProcessor& processorRef, juce::AudioProc
 	midReverbBoxAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "midReverbPreset", midReverbBox);
 
 	// Reverb Slider Listener
-   midBandReverbSlider.onValueChange = [this, &processorRef]()
-        {
-		   float master = midBandReverbSlider.getValue();
-		   processorRef.midBandReverbParameters.wetLevel = processorRef.midBaseWetLevel * master;
-		   processorRef.midBandReverbParameters.damping = processorRef.midBaseDamping * master;
-		   processorRef.midBandReverbParameters.width = processorRef.midBaseWidth * master;
-		   processorRef.midBandReverbParameters.roomSize = processorRef.midBaseRoomSize;
-		   processorRef.midBandReverbParameters.dryLevel = processorRef.midBaseDryLevel;
-		   processorRef.midBandReverbParameters.freezeMode = processorRef.midBaseFreezeMode;
-		   processorRef.midBandReverbProcessor.setParameters(processorRef.midBandReverbParameters);
-	    };
+   //midBandReverbSlider.onValueChange = [this, &processorRef]()
+   //     {
+		 //  float master = midBandReverbSlider.getValue();
+		 //  processorRef.midBandReverbParameters.wetLevel = processorRef.midBaseWetLevel * master;
+		 //  processorRef.midBandReverbParameters.damping = processorRef.midBaseDamping * master;
+		 //  processorRef.midBandReverbParameters.width = processorRef.midBaseWidth * master;
+		 //  processorRef.midBandReverbParameters.roomSize = processorRef.midBaseRoomSize;
+		 //  processorRef.midBandReverbParameters.dryLevel = processorRef.midBaseDryLevel;
+		 //  processorRef.midBandReverbParameters.freezeMode = processorRef.midBaseFreezeMode;
+		 //  processorRef.midBandReverbProcessor.setParameters(processorRef.midBandReverbParameters);
+	  //  };
 
-   //ComboBox Listener
-   midReverbBox.onChange = [this, &processorRef]()
-	   {
-		   int presetIndex = midReverbBox.getSelectedItemIndex();
-		   processorRef.loadReverbPreset(presetIndex, 'm');
-	   };
+   ////ComboBox Listener
+   //midReverbBox.onChange = [this, &processorRef]()
+	  // {
+		 //  int presetIndex = midReverbBox.getSelectedItemIndex();
+		 //  processorRef.loadReverbPreset(presetIndex, 'm');
+	  // };
 
    //Populate ComboBox with reverb presets
    midReverbBox.addItem("Small Room", 1);

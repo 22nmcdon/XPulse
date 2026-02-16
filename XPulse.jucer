@@ -6,6 +6,33 @@
               defines="JUCE_PLUGINHOST_VST3=1">
   <MAINGROUP id="mRjcMg" name="XPulse">
     <GROUP id="{AA115B7E-3C34-147D-B326-5D68438A938A}" name="Source">
+      <GROUP id="{3532132F-AF7B-3D76-EE9C-A919C12EAB8E}" name="BinaryData">
+        <GROUP id="{464BB25B-76E7-5F81-CF8A-4419ACA91AD4}" name="KeyBoard">
+          <FILE id="UAOaRy" name="KeyBoard.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/KeyBoard.png"/>
+        </GROUP>
+        <GROUP id="{1D4E1CA2-C78D-2E0A-1258-691B00D33B9D}" name="Knobs">
+          <FILE id="X1Ow1N" name="Knob.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/Knob.png"/>
+        </GROUP>
+        <GROUP id="{0C79C516-2B29-CD3C-1533-D44305377053}" name="Buttons">
+          <FILE id="s1l01V" name="bypassOff.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/bypassOff.png"/>
+          <FILE id="G6won7" name="bypassOffHover.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/bypassOffHover.png"/>
+          <FILE id="Akolvm" name="bypassOn.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/bypassOn.png"/>
+          <FILE id="xTVap4" name="bypassOnHover.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/bypassOnHover.png"/>
+        </GROUP>
+      </GROUP>
+      <GROUP id="{191CB3BC-5001-30AF-1DD8-50904B221AB1}" name="Hosting">
+        <FILE id="yFopK9" name="BandPluginSlot.cpp" compile="1" resource="0"
+              file="Source/BandPluginSlot.cpp"/>
+        <FILE id="VQvZ4Y" name="BandPluginSlot.h" compile="0" resource="0"
+              file="Source/BandPluginSlot.h"/>
+        <FILE id="SDwLPv" name="PluginPool.cpp" compile="1" resource="0" file="Source/PluginPool.cpp"/>
+        <FILE id="cCkyM0" name="PluginPool.h" compile="0" resource="0" file="Source/PluginPool.h"/>
+        <FILE id="KJp8N6" name="HostProcessor.h" compile="0" resource="0" file="Source/HostProcessor.h"/>
+        <FILE id="UJa4Z5" name="HostProcessor.cpp" compile="1" resource="0"
+              file="Source/HostProcessor.cpp"/>
+      </GROUP>
       <GROUP id="{111B6488-9EF1-624A-B302-3C0444F545AD}" name="PitchDependentFX">
         <FILE id="LNsC3e" name="PitchDependentFXContent.cpp" compile="1" resource="0"
               file="Source/PitchDependentFXContent.cpp"/>
@@ -58,9 +85,6 @@
         <FILE id="E8XpPl" name="HighBandWindow.cpp" compile="1" resource="0"
               file="Source/HighBandWindow.cpp"/>
       </GROUP>
-      <FILE id="UJa4Z5" name="HostProcessor.cpp" compile="1" resource="0"
-            file="Source/HostProcessor.cpp"/>
-      <FILE id="KJp8N6" name="HostProcessor.h" compile="0" resource="0" file="Source/HostProcessor.h"/>
       <FILE id="NKzO6H" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="kVWPTT" name="PluginProcessor.h" compile="0" resource="0"

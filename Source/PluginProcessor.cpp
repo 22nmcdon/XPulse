@@ -23,6 +23,16 @@ XPulseAudioProcessor::XPulseAudioProcessor()
     parameters(*this, nullptr, "PARAMETERS", createParameterLayout())
 #endif
 {
+	// Initialise band plugin instance IDs and send/return amounts to default values
+    for (int b = 0; b < kNumBands; ++b)
+    {
+        for (int s = 0; s < kNumSlots; ++s)
+        {
+            bandPluginInstanceId[b][s].store(0, std::memory_order_relaxed);
+            bandSendAmount[b][s].store(0.0f, std::memory_order_relaxed);
+            bandReturnAmount[b][s].store(1.0f, std::memory_order_relaxed);
+        }
+    }
 }
 
 XPulseAudioProcessor::~XPulseAudioProcessor()
@@ -93,27 +103,33 @@ void XPulseAudioProcessor::changeProgramName (int index, const juce::String& new
 
 //==============================================================================
 
-//Important for all pre-playback initialisation ie Gain processors, Filters, Delays, Reverbs etc
+//Important for all pre-playback initialisation ie Gain processors, Filters, Delays etc
 void XPulseAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    currentSampleRate = sampleRate;
 
     juce::dsp::ProcessSpec spec;
 	spec.sampleRate = getSampleRate();
 	spec.maximumBlockSize = getBlockSize();
     spec.numChannels = getTotalNumOutputChannels();
+
     
-	// Host Processor
-    hostProcessor_.prepareToPlay(sampleRate, samplesPerBlock);
-
-
     // Gain processor
 	prepareGainProcessor(spec);
 
 	// Band filters
 	prepareBandFilters(spec);
+	updateBandFilterCutoffs();
 
-	// Reverb
-	prepareReverbProcessor(spec);
+    hostProcessor_.prepareToPlay(sampleRate, samplesPerBlock); // (important for hosted plugins too)
+
+
+	// Removes per-block heap allocations by pre-sizing buffers
+    auto numCh = getTotalNumOutputChannels();
+    lowBuffer.setSize(numCh, samplesPerBlock);
+    midBuffer.setSize(numCh, samplesPerBlock);
+    highBuffer.setSize(numCh, samplesPerBlock);
+    auxBuffer.setSize(numCh, samplesPerBlock);
 	
 }
 
@@ -159,10 +175,6 @@ void XPulseAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
-
-
-	//Important Host Processing
-	hostProcessor_.processBlock(buffer, midiMessages);
 
 	//Process incoming MIDI messages
 	processMidi(midiMessages);
@@ -222,25 +234,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout XPulseAudioProcessor::create
 	//Band Filters Cutoff Frequencies
     params.push_back(std::make_unique<juce::AudioParameterFloat>("cutoff", "Cutoff", 20.0f, 20000.0f, 1000.0f));
 
-	//Reverb Parameters: roomSize, damping, wetLevel, dryLevel, width, freezeMode, Master
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("roomSize", "Room Size", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("damping", "Damping", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("wetLevel", "Wet Level", 0.0f, 1.0f, 0.33f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("dryLevel", "Dry Level", 0.0f, 1.0f, 0.4f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("width", "Width", 0.0f, 1.0f, 1.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("freezeMode", "Freeze Mode", 0.0f, 1.0f, 0.0f));
+	//Band Split Frequencies
+    auto hzRange = juce::NormalisableRange<float>(20.0f, 20000.0f);
+    hzRange.setSkewForCentre(1000.0f); //Centre
 
-	params.push_back(std::make_unique<juce::AudioParameterFloat>("highReverbMaster", "Reverb Master", 0.0f, 1.0f, 0.5f));
-	params.push_back(std::make_unique<juce::AudioParameterFloat>("midReverbMaster", "Reverb Master", 0.0f, 1.0f, 0.5f));
-	params.push_back(std::make_unique<juce::AudioParameterFloat>("lowReverbMaster", "Reverb Master", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("lowMidCrossover", "Low-Mid Crossover", hzRange, 250.0f));
 
-	//Reverb Preset Selection
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("lowReverbPreset", "Low Reverb Preset",
-		juce::StringArray{ "Small Room", "Concert Hall", "Dark Room", "Bright Room", "Ambient Room" }, 0));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("midReverbPreset", "Mid Reverb Preset",
-        juce::StringArray{ "Small Room", "Concert Hall", "Dark Room", "Bright Room", "Ambient Room" }, 0));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("highReverbPreset", "High Reverb Preset",
-        juce::StringArray{ "Small Room", "Concert Hall", "Dark Room", "Bright Room", "Ambient Room" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("midHighCrossover", "Mid-High Crossover", hzRange, 4000.0f));
 
 
 	//Return the parameter layout
@@ -257,62 +257,30 @@ void XPulseAudioProcessor::processMidi(juce::MidiBuffer& midiMessages) {
     
 }
 
-//Load Reverb Preset Function
-void XPulseAudioProcessor::loadReverbPreset(int presetIndex, char band)
-{
-    DBG("loadReverbPreset called: presetIndex=" << presetIndex << ", band='" << band << "'");
-    // Preset values (0.0–1.0)
-    struct Preset { float room, damp, wet, dry, width, freeze; };
-    static const Preset presets[] = {
-        { 0.2f, 0.3f, 0.2f, 0.9f, 0.5f, 0.0f }, // Small Room
-        { 0.8f, 0.5f, 0.4f, 0.8f, 1.0f, 0.0f }, // Concert Hall
-        { 0.4f, 0.9f, 0.3f, 0.85f, 0.6f, 0.0f }, // Dark Room
-        { 0.6f, 0.1f, 0.35f, 0.9f, 1.0f, 0.0f }, // Bright Room
-        { 0.9f, 0.5f, 0.6f, 0.5f, 1.0f, 1.0f }, // Ambient Room
-    };
-    if (presetIndex >= 0 && presetIndex < 5)
-    {
-        // Set APVTS parameters (normalized 0.0–1.0)
-        if (band == 'l') {
-            lowBaseRoomSize = presets[presetIndex].room;
-            lowBaseDamping = presets[presetIndex].damp;
-            lowBaseWetLevel = presets[presetIndex].wet;
-            lowBaseDryLevel = presets[presetIndex].dry;
-            lowBaseWidth = presets[presetIndex].width;
-            lowBaseFreezeMode = presets[presetIndex].freeze;
-        }
-        else if (band == 'm') {
-            midBaseRoomSize = presets[presetIndex].room;
-            midBaseDamping = presets[presetIndex].damp;
-            midBaseWetLevel = presets[presetIndex].wet;
-            midBaseDryLevel = presets[presetIndex].dry;
-            midBaseWidth = presets[presetIndex].width;
-            midBaseFreezeMode = presets[presetIndex].freeze;
-		}
-		else if (band == 'h') {
-		    highBaseRoomSize = presets[presetIndex].room;
-		    highBaseDamping = presets[presetIndex].damp;
-		    highBaseWetLevel = presets[presetIndex].wet;
-		    highBaseDryLevel = presets[presetIndex].dry;
-		    highBaseWidth = presets[presetIndex].width;
-		    highBaseFreezeMode = presets[presetIndex].freeze;
-        }
-    }
-}
-
 #pragma region PitchDependentProcessing
 //Pitch-Dependent Processing Function Audio
 
 void XPulseAudioProcessor::pitchDependent(juce::AudioBuffer<float>& buffer) {
-	juce::AudioBuffer<float> lowBuffer, midBuffer, highBuffer;
-	lowBuffer.makeCopyOf(buffer);
-	midBuffer.makeCopyOf(buffer);
-	highBuffer.makeCopyOf(buffer);
+	//Create copies of the main buffer for each band and ensures buffers are 
+    // the correct size causing no  need to reallocate memory each block
+    lowBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+    midBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+    highBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        lowBuffer.copyFrom(ch, 0, buffer, ch, 0, buffer.getNumSamples());
+        midBuffer.copyFrom(ch, 0, buffer, ch, 0, buffer.getNumSamples());
+        highBuffer.copyFrom(ch, 0, buffer, ch, 0, buffer.getNumSamples());
+    }
 
 	//Process each band
 	processLowBand(lowBuffer);
 	processMidBand(midBuffer);
 	processHighBand(highBuffer);
+
+    //Runs sends into Hosted Plugins
+    processHostedSends(lowBuffer, midBuffer, highBuffer);
 
 	buffer.clear();
 
@@ -327,81 +295,86 @@ void XPulseAudioProcessor::pitchDependent(juce::AudioBuffer<float>& buffer) {
 void XPulseAudioProcessor::processLowBand(juce::AudioBuffer<float>& buffer) {
     //Process Low Band
 
-	//Apply Low-Pass Filter ----
+    //Apply Low-Pass Filter 
     //Build an AudioBlock and process it with the DSP processors
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
-	lowBand.process(context);
+    lowBand.process(context);
 
-	//Apply Gain ----
-	float lowGainValue = *parameters.getRawParameterValue("lowGain");
-	lowGainProcessor.setGainLinear(lowGainValue);
+    //Apply Gain 
+    float lowGainValue = *parameters.getRawParameterValue("lowGain");    
+    lowGainProcessor.setGainLinear(lowGainValue);
     lowGainProcessor.process(context);
 
-
-	//Apply Reverb ----
-	/*float master = *parameters.getRawParameterValue("lowReverbMaster");
-    lowBandReverbParameters.roomSize = lowBaseRoomSize;
-    lowBandReverbParameters.damping = lowBaseDamping * master;
-    lowBandReverbParameters.wetLevel = lowBaseWetLevel * master;
-    lowBandReverbParameters.dryLevel = lowBaseDryLevel;
-    lowBandReverbParameters.width = lowBaseWidth * master;
-    lowBandReverbParameters.freezeMode = lowBaseFreezeMode;
-    lowBandReverbProcessor.setParameters(lowBandReverbParameters);*/
-	lowBandReverbProcessor.process(context);
 }
 
 void XPulseAudioProcessor::processMidBand(juce::AudioBuffer<float>& buffer) {
     //Process Mid Band
 
-    //Apply Band-Pass Filter ----
-	//Build an AudioBlock and process it with the DSP processors
+    //Apply Band-Pass Filter 
+    //Build an AudioBlock and process it with the DSP processors
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
-	midBand.process(context);
 
-	//Apply Gain ----
-	float midGainValue = *parameters.getRawParameterValue("midGain");
-	midGainProcessor.setGainLinear(midGainValue);
+    auto& midHP = midBand.get<0>();
+    auto& midLP = midBand.get<1>();
+    midBand.process(context);
+
+    //Apply Gain 
+    float midGainValue = *parameters.getRawParameterValue("midGain");
+    midGainProcessor.setGainLinear(midGainValue);
     midGainProcessor.process(context);
-
-	//Apply Reverb ----
-    /*float master = *parameters.getRawParameterValue("midReverbMaster");
-    midBandReverbParameters.roomSize = midBaseRoomSize;
-    midBandReverbParameters.damping = midBaseDamping * master;
-    midBandReverbParameters.wetLevel = midBaseWetLevel * master;
-    midBandReverbParameters.dryLevel = midBaseDryLevel;
-    midBandReverbParameters.width = midBaseWidth * master;
-    midBandReverbParameters.freezeMode = midBaseFreezeMode;
-	midBandReverbProcessor.setParameters(midBandReverbParameters);*/
-    midBandReverbProcessor.process(context);
 }
 
 void XPulseAudioProcessor::processHighBand(juce::AudioBuffer<float>& buffer) {
     //Process High Band
 
-	//Apply High-Pass Filter ----
+    //Apply High-Pass Filter
     //Build an AudioBlock and process it with the DSP processors
     juce::dsp::AudioBlock<float> block(buffer);
-	juce::dsp::ProcessContextReplacing<float> context(block);
-	highBand.process(context);
+    juce::dsp::ProcessContextReplacing<float> context(block);
+    highBand.process(context);
 
-	//Apply Reverb ----
-	float highGainValue = *parameters.getRawParameterValue("highGain");
-	highGainProcessor.setGainLinear(highGainValue);
-	highGainProcessor.process(context);
+    //Apply Gain 
+    float highGainValue = *parameters.getRawParameterValue("highGain");
+    highGainProcessor.setGainLinear(highGainValue);
+    highGainProcessor.process(context);
 
-	//Apply Reverb ----
-    /*float master = *parameters.getRawParameterValue("highReverbMaster");
-    highBandReverbParameters.roomSize = highBaseRoomSize;
-    highBandReverbParameters.damping = highBaseDamping * master;
-    highBandReverbParameters.wetLevel = highBaseWetLevel * master;
-    highBandReverbParameters.dryLevel = highBaseDryLevel;
-    highBandReverbParameters.width = highBaseWidth * master;
-    highBandReverbParameters.freezeMode = highBaseFreezeMode;
-    highBandReverbProcessor.setParameters(highBandReverbParameters);*/
-	highBandReverbProcessor.process(context);
+
 }
+
+void XPulseAudioProcessor::setBandSplits(float lowMidHz, float midHighHz)
+{
+    lowMidHz = juce::jlimit(20.0f, 20000.0f, lowMidHz);
+    midHighHz = juce::jlimit(20.0f, 20000.0f, midHighHz);
+
+    const float minGapHz = 10.0f;
+    if (midHighHz < lowMidHz + minGapHz)
+        midHighHz = lowMidHz + minGapHz;
+
+    if (auto* p1 = parameters.getParameter("lowMidCrossover"))
+    {
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p1);
+        jassert(ranged);
+
+        p1->beginChangeGesture();
+        p1->setValueNotifyingHost(ranged->convertTo0to1(lowMidHz));
+        p1->endChangeGesture();
+    }
+
+    if (auto* p2 = parameters.getParameter("midHighCrossover"))
+    {
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p2);
+        jassert(ranged);
+
+        p2->beginChangeGesture();
+        p2->setValueNotifyingHost(ranged->convertTo0to1(midHighHz));
+        p2->endChangeGesture();
+    }
+	updateBandFilterCutoffs();
+}
+
+
 
 //Pitch Dependent Processing MIDI
 void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages) {
@@ -530,76 +503,198 @@ void XPulseAudioProcessor::prepareGainProcessor(const juce::dsp::ProcessSpec& sp
     highGainProcessor.reset();
 }
 
-void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec) {
-    // Band filters Setup
-    if (lowBandCoefficients == nullptr)
-		lowBandCoefficients = new juce::dsp::IIR::Coefficients<float>();
-    *lowBandCoefficients = *juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 200.0f); //Above 200Hz is cutoff
-    lowBand.state = lowBandCoefficients;
+void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec)
+{
+    currentSampleRate = spec.sampleRate;
 
-    auto& midHighPass = midBand.get<0>();
-    auto& midLowPass = midBand.get<1>();
+    // 1) set initial states FIRST (non-null)
+    lowBand.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 250.0f);
 
-	if (midHighPass.state == nullptr)
-        midHighPass.state = new juce::dsp::IIR::Coefficients<float>();
-	*midHighPass.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 200.0f); //Below 200Hz is cutoff
-	midHighPass.state = midHighPass.state;
+    auto& midHP = midBand.get<0>();
+    auto& midLP = midBand.get<1>();
+    midHP.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 250.0f);
+    midLP.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 4000.0f);
 
-	if (midLowPass.state == nullptr)
-		midLowPass.state = new juce::dsp::IIR::Coefficients<float>();
-    *midLowPass.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 2000.0f); //Above 2000Hz is cutoff
-	midLowPass.state = midLowPass.state;
+    highBand.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 4000.0f);
 
-	if (highBandCoefficients == nullptr)
-        highBandCoefficients = new juce::dsp::IIR::Coefficients<float>();
-	*highBandCoefficients = *juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 2000.0f); //Below 2000Hz is cutoff
-	highBand.state = highBandCoefficients;
-
-	// Prepare/Reset filters
+    // 2) now prepare
     lowBand.prepare(spec);
     midBand.prepare(spec);
     highBand.prepare(spec);
+
+    // 3) now reset
     lowBand.reset();
     midBand.reset();
-	highBand.reset();
+    highBand.reset();
 }
 
-void XPulseAudioProcessor::prepareReverbProcessor(const juce::dsp::ProcessSpec& spec) {
-    // Reverb Bands Setup
-    highBandReverbProcessor.prepare(spec);
-    midBandReverbProcessor.prepare(spec);
-    lowBandReverbProcessor.prepare(spec);
+
+void XPulseAudioProcessor::updateBandFilterCutoffs()
+{
+    if (currentSampleRate <= 0.0)
+    {
+        DBG("[XPulse] currentSampleRate is invalid: " + juce::String(currentSampleRate));
+        return;
+    }
+
+    auto* pLo = parameters.getRawParameterValue("lowMidCrossover");
+    auto* pHi = parameters.getRawParameterValue("midHighCrossover");
 
 
-    // Set some default reverb parameters for the bands
-    //High Band Reverb
-    highBandReverbParameters.roomSize = 0.5f; // 0.0 to 1.0
-    highBandReverbParameters.damping = 0.5f; // 0.0 to 1.0
-    highBandReverbParameters.wetLevel = 0.33f; // 0.0 to 1.0
-    highBandReverbParameters.dryLevel = 0.4f; // 0.0 to 1.0
-    highBandReverbParameters.width = 1.0f; // 0.0 to 1.0
-    highBandReverbParameters.freezeMode = 0.0f; // 0.0 (off) to 1.0 (infinite reverb)
-    highBandReverbProcessor.setParameters(highBandReverbParameters);
+    if (pLo == nullptr || pHi == nullptr)
+    {
+        DBG("[XPulse] Crossover parameter pointers are null");
+        return;
+    }
 
-    //Mid Band Reverb
-    midBandReverbParameters.roomSize = 0.5f; // 0.0 to 1.0
-    midBandReverbParameters.damping = 0.5f; // 0.0 to 1.0
-    midBandReverbParameters.wetLevel = 0.33f; // 0.0 to 1.0
-    midBandReverbParameters.dryLevel = 0.4f; // 0.0 to 1.0
-    midBandReverbParameters.width = 1.0f; // 0.0 to 1.0
-    midBandReverbParameters.freezeMode = 0.0f; // 0.0 (off) to 1.0 (infinite reverb)
-    midBandReverbProcessor.setParameters(midBandReverbParameters);
+    float lo = *pLo;
+    float hi = *pHi;
 
-    //Low Band Reverb
-    lowBandReverbParameters.roomSize = 0.5f; // 0.0 to 1.0
-    lowBandReverbParameters.damping = 0.5f; // 0.0 to 1.0
-    lowBandReverbParameters.wetLevel = 0.33f; // 0.0 to 1.0
-    lowBandReverbParameters.dryLevel = 0.4f; // 0.0 to 1.0
-    lowBandReverbParameters.width = 1.0f; // 0.0 to 1.0
-    lowBandReverbParameters.freezeMode = 0.0f; // 0.0 (off) to 1.0 (infinite reverb)
-    lowBandReverbProcessor.setParameters(lowBandReverbParameters);
+   
+    // Clamp to safe range AND nyquist-safe range
+    const float nyquistSafe = (float)(0.49 * currentSampleRate);
+    lo = juce::jlimit(20.0f, nyquistSafe, lo);
+    hi = juce::jlimit(20.0f, nyquistSafe, hi);
 
+    // enforce ordering + gap
+    const float minGapHz = 10.0f;
+    if (hi < lo + minGapHz) hi = juce::jmin(nyquistSafe, lo + minGapHz);
+
+    // state pointers must exist
+    auto& midHP = midBand.get<0>();
+    auto& midLP = midBand.get<1>();
+
+    if (lowBand.state == nullptr || midHP.state == nullptr || midLP.state == nullptr || highBand.state == nullptr)
+    {
+        DBG("[XPulse] One or more filter state pointers are null!");
+        DBG("  lowBand.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)lowBand.state.get()));
+        DBG("  midHP.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)midHP.state.get()));
+        DBG("  midLP.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)midLP.state.get()));
+        DBG("  highBand.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)highBand.state.get()));
+        return;
+    }
+
+    DBG("[XPulse] updateBandFilterCutoffs: sampleRate=" + juce::String(currentSampleRate) + ", lo=" + juce::String(lo) + ", hi=" + juce::String(hi));
+
+    // IMPORTANT: swap pointer, don't mutate *state in place
+    lowBand.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, lo);
+    midHP.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, lo);
+    midLP.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, hi);
+    highBand.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, hi);
 }
+
+
+
+#pragma endregion
+
+#pragma region HostedPluginSends
+void XPulseAudioProcessor::processHostedSends(juce::AudioBuffer<float>& low,
+    juce::AudioBuffer<float>& mid,
+    juce::AudioBuffer<float>& high)
+{
+    juce::MidiBuffer emptyMidi;
+
+    const auto numCh = low.getNumChannels();
+    const auto numSamp = low.getNumSamples();
+
+    // Each slot can route to an arbitrary hosted instance.
+    // bandPluginInstanceId[3][3], bandSendAmount[3][3], bandReturnAmount[3][3]
+    static constexpr int kNumBands = 3;
+    static constexpr int kNumSlots = 3;
+
+    // Gather unique instance IDs across all band/slot routes
+    PluginPool::InstanceId usedIds[kNumBands * kNumSlots] = {};
+    int numUsed = 0;
+
+    auto pushUnique = [&](PluginPool::InstanceId id)
+        {
+            if (id == 0) return;
+
+            for (int i = 0; i < numUsed; ++i)
+                if (usedIds[i] == id)
+                    return;
+
+            usedIds[numUsed++] = id;
+        };
+
+    for (int band = 0; band < kNumBands; ++band)
+        for (int slot = 0; slot < kNumSlots; ++slot)
+            pushUnique((PluginPool::InstanceId)bandPluginInstanceId[band][slot].load(std::memory_order_relaxed));
+
+    // For each unique hosted instance, sum all sends targeting it, process once, then return to all targets.
+    for (int u = 0; u < numUsed; ++u)
+    {
+        const auto id = usedIds[u];
+
+        auto* plugin = hostProcessor_.getPool().getInstanceForAudio(id);
+        if (!plugin)
+            continue;
+
+        auxBuffer.setSize(numCh, numSamp, false, false, true);
+        auxBuffer.clear();
+
+        // Sum sends from any band/slot that routes to this instance id
+        auto sumSendFrom = [&](int bandIndex, int slotIndex, juce::AudioBuffer<float>& bandBuf)
+            {
+                const auto routedId =
+                    (PluginPool::InstanceId)bandPluginInstanceId[bandIndex][slotIndex].load(std::memory_order_relaxed);
+
+                if (routedId != id)
+                    return;
+
+                const float send =
+                    bandSendAmount[bandIndex][slotIndex].load(std::memory_order_relaxed);
+
+                if (send <= 0.0001f)
+                    return;
+
+                for (int ch = 0; ch < numCh; ++ch)
+                    auxBuffer.addFrom(ch, 0, bandBuf, ch, 0, numSamp, send);
+            };
+
+        // Low band
+        for (int slot = 0; slot < kNumSlots; ++slot)
+            sumSendFrom(0, slot, low);
+
+        // Mid band
+        for (int slot = 0; slot < kNumSlots; ++slot)
+            sumSendFrom(1, slot, mid);
+
+        // High band
+        for (int slot = 0; slot < kNumSlots; ++slot)
+            sumSendFrom(2, slot, high);
+
+        // Process hosted plugin once for this instance id
+        plugin->processBlock(auxBuffer, emptyMidi);
+
+        // Return wet back to any band/slot that routes to this instance id
+        auto returnTo = [&](int bandIndex, int slotIndex, juce::AudioBuffer<float>& bandBuf)
+            {
+                const auto routedId =
+                    (PluginPool::InstanceId)bandPluginInstanceId[bandIndex][slotIndex].load(std::memory_order_relaxed);
+
+                if (routedId != id)
+                    return;
+
+                const float ret =
+                    bandReturnAmount[bandIndex][slotIndex].load(std::memory_order_relaxed);
+
+               
+                if (ret <= 0.0001f)
+                    return;
+
+                for (int ch = 0; ch < numCh; ++ch)
+                    bandBuf.addFrom(ch, 0, auxBuffer, ch, 0, numSamp, ret);
+            };
+
+        for (int slot = 0; slot < kNumSlots; ++slot) returnTo(0, slot, low);
+        for (int slot = 0; slot < kNumSlots; ++slot) returnTo(1, slot, mid);
+        for (int slot = 0; slot < kNumSlots; ++slot) returnTo(2, slot, high);
+    }
+}
+
+
+
 #pragma endregion
 
 #pragma endregion
