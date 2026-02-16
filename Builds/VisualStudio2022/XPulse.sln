@@ -1,17 +1,16 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
+Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36908.2 d17.14
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPulse_VST3", "XPulse_VST3.vcxproj", "{FBE2ACCB-D3C3-184A-5D6F-CB5F26570105}"
+
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPulse - VST3", "XPulse_VST3.vcxproj", "{FBE2ACCB-D3C3-184A-5D6F-CB5F26570105}"
 	ProjectSection(ProjectDependencies) = postProject
-		{3D0A199A-87ED-A544-4529-2147612482FF} = {3D0A199A-87ED-A544-4529-2147612482FF}
 		{F70214F0-3E5D-4964-14C6-75F6722B12D9} = {F70214F0-3E5D-4964-14C6-75F6722B12D9}
+		{3D0A199A-87ED-A544-4529-2147612482FF} = {3D0A199A-87ED-A544-4529-2147612482FF}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPulse_SharedCode", "XPulse_SharedCode.vcxproj", "{F70214F0-3E5D-4964-14C6-75F6722B12D9}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPulse - Shared Code", "XPulse_SharedCode.vcxproj", "{F70214F0-3E5D-4964-14C6-75F6722B12D9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPulse_VST3ManifestHelper", "XPulse_VST3ManifestHelper.vcxproj", "{3D0A199A-87ED-A544-4529-2147612482FF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPulse - VST3 Manifest Helper", "XPulse_VST3ManifestHelper.vcxproj", "{3D0A199A-87ED-A544-4529-2147612482FF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -34,8 +33,5 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {9F148EDB-15A6-48A9-9638-551EA78305BD}
 	EndGlobalSection
 EndGlobal

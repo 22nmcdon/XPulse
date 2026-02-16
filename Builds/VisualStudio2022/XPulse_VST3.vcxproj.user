@@ -1,7 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommand>"C:\Dev\JUCE\extras\AudioPluginHost\Builds\VisualStudio2022\x64\Debug\App\AudioPluginHost.exe"</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>C:\Dev\JUCE\extras\AudioPluginHost\Builds\VisualStudio2022\x64\Debug\App</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommand>C:\Users\Noah\OneDrive\Desktop\JuceF\juce-8.0.9-windows\JUCE\extras\AudioPluginHost\Builds\VisualStudio2022\x64\Debug\App\AudioPluginHost.exe</LocalDebuggerCommand>
   </PropertyGroup>
 </Project>
