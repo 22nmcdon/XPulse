@@ -6,7 +6,43 @@
               defines="JUCE_PLUGINHOST_VST3=1">
   <MAINGROUP id="mRjcMg" name="XPulse">
     <GROUP id="{AA115B7E-3C34-147D-B326-5D68438A938A}" name="Source">
+      <GROUP id="{327BCABD-45C3-E5A6-855C-C06F22F416A6}" name="CustomComponents">
+        <FILE id="yFopK9" name="BandPluginSlot.cpp" compile="1" resource="0"
+              file="Source/BandPluginSlot.cpp"/>
+        <FILE id="VQvZ4Y" name="BandPluginSlot.h" compile="0" resource="0"
+              file="Source/BandPluginSlot.h"/>
+        <FILE id="UZIPAX" name="MidiDisplay.h" compile="0" resource="0" file="Source/MidiDisplay.h"/>
+        <FILE id="RBlU1e" name="RotaryLabelKnob.h" compile="0" resource="0"
+              file="Source/RotaryLabelKnob.h"/>
+      </GROUP>
       <GROUP id="{3532132F-AF7B-3D76-EE9C-A919C12EAB8E}" name="BinaryData">
+        <GROUP id="{DB8094B4-76DA-065A-2D07-02F5381D5877}" name="Text">
+          <FILE id="jTtBAw" name="ARCADECLASSIC.TTF" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/Text/ARCADECLASSIC.TTF"/>
+          <FILE id="JdWyoz" name="pizzadudedotdk.txt" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/Text/pizzadudedotdk.txt"/>
+        </GROUP>
+        <GROUP id="{2CCDDEA0-5614-36CF-34D9-239CAE15008C}" name="ComboBox">
+          <FILE id="fUuUX7" name="ComboBoxBlueOff.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/ComboBoxBlueOff.png"/>
+          <FILE id="XI5mmq" name="ComboBoxBlueOn.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/ComboBoxBlueOn.png"/>
+          <FILE id="ObaysQ" name="ComboBoxRedOff.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/ComboBoxRedOff.png"/>
+          <FILE id="un0C56" name="ComboBoxRedOn.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/ComboBoxRedOn.png"/>
+        </GROUP>
+        <GROUP id="{2295D75B-72AF-34C3-8CCA-7C68A3687742}" name="Slider">
+          <FILE id="pAIlQq" name="SliderBar.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/SliderBar.png"/>
+          <FILE id="Py7YR8" name="SliderLeftOff.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/SliderLeftOff.png"/>
+          <FILE id="FKwpjt" name="SliderLeftOn.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/SliderLeftOn.png"/>
+          <FILE id="k4uSqH" name="SliderRightOff.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/SliderRightOff.png"/>
+          <FILE id="ntRJiQ" name="SliderRightOn.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/SliderRightOn.png"/>
+        </GROUP>
         <GROUP id="{464BB25B-76E7-5F81-CF8A-4419ACA91AD4}" name="KeyBoard">
           <FILE id="UAOaRy" name="KeyBoard.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/KeyBoard.png"/>
         </GROUP>
@@ -20,13 +56,14 @@
           <FILE id="Akolvm" name="bypassOn.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/bypassOn.png"/>
           <FILE id="xTVap4" name="bypassOnHover.png" compile="0" resource="1"
                 file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/bypassOnHover.png"/>
+          <FILE id="ia9Tzo" name="midiOff.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/midiOff.png"/>
+          <FILE id="yYNyv2" name="midiOffHover.png" compile="0" resource="1"
+                file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/midiOffHover.png"/>
+          <FILE id="kot9jr" name="midiOn.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/midiOn.png"/>
+          <FILE id="zbdmvm" name="midiOnHover.png" compile="0" resource="1" file="../../../Users/Noah/OneDrive/Pictures/JUCE component images/midiOnHover.png"/>
         </GROUP>
       </GROUP>
       <GROUP id="{191CB3BC-5001-30AF-1DD8-50904B221AB1}" name="Hosting">
-        <FILE id="yFopK9" name="BandPluginSlot.cpp" compile="1" resource="0"
-              file="Source/BandPluginSlot.cpp"/>
-        <FILE id="VQvZ4Y" name="BandPluginSlot.h" compile="0" resource="0"
-              file="Source/BandPluginSlot.h"/>
         <FILE id="SDwLPv" name="PluginPool.cpp" compile="1" resource="0" file="Source/PluginPool.cpp"/>
         <FILE id="cCkyM0" name="PluginPool.h" compile="0" resource="0" file="Source/PluginPool.h"/>
         <FILE id="KJp8N6" name="HostProcessor.h" compile="0" resource="0" file="Source/HostProcessor.h"/>

@@ -67,6 +67,7 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	addAndMakeVisible(highBandGroup);
 	addAndMakeVisible(bandSplitControlsGroup);
 
+	setLookAndFeel(&pluginLookAndFeel);
 	// Custom Image Assignments
 	//Button Images
 	auto offImg = juce::ImageCache::getFromMemory(BinaryData::bypassOff_png, BinaryData::bypassOff_pngSize);
@@ -74,9 +75,13 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	auto onImg = juce::ImageCache::getFromMemory(BinaryData::bypassOn_png, BinaryData::bypassOn_pngSize);
 	auto onHoverImg = juce::ImageCache::getFromMemory(BinaryData::bypassOnHover_png, BinaryData::bypassOnHover_pngSize);
 
-	//Knob Image
-	knob.knobImg = juce::ImageCache::getFromMemory(BinaryData::Knob_png, BinaryData::Knob_pngSize);
+	auto midiDisplayOnImg = juce::ImageCache::getFromMemory(BinaryData::midiOn_png, BinaryData::midiOn_pngSize);
+	auto midiDisplayOnHoverImg = juce::ImageCache::getFromMemory(BinaryData::midiOnHover_png, BinaryData::midiOnHover_pngSize);
+	auto midiDisplayOffImg = juce::ImageCache::getFromMemory(BinaryData::midiOff_png, BinaryData::midiOff_pngSize);
+	auto midiDisplayOffHoverImg = juce::ImageCache::getFromMemory(BinaryData::midiOffHover_png, BinaryData::midiOffHover_pngSize);
+
 #pragma endregion
+
 
 #pragma region LowBand
 	//LowBand Components
@@ -93,41 +98,57 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	lowBypassBus1Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(lowBypassBus1Button);
 	//Knob
-	lowBandBus1LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	lowBandBus1LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	lowBandBus1LevelSlider.setRange(0.0, 1.0, 0.001);
-	lowBandBus1LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+	addAndMakeVisible(lowBandBus1LevelSlider);
+
+	auto& low1 = lowBandBus1LevelSlider.getSlider();
+	low1.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	low1.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	low1.setRange(0.0, 1.0, 0.001);
+	low1.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
 		juce::MathConstants<float>::pi * 3.25f,
 		true);
 
-	lowBandBus1LevelSlider.setLookAndFeel(&knob);
-	addAndMakeVisible(lowBandBus1LevelSlider);
+	// Label style + percent formatting
+	lowBandBus1LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	lowBandBus1LevelSlider.setAsPercentKnob();
 
 	// Bus2 Logic
+	//Button
 	lowBypassBus2Button.setClickingTogglesState(true);
 	lowBypassBus2Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(lowBypassBus2Button);
-	lowBandBus2LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	lowBandBus2LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	lowBandBus2LevelSlider.setRange(0.0, 1.0, 0.001);
-	lowBandBus2LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
-		juce::MathConstants<float>::pi * 3.25f,
-		true);
-	lowBandBus2LevelSlider.setLookAndFeel(&knob);
+	//Knob
 	addAndMakeVisible(lowBandBus2LevelSlider);
 
-	// Bus3 Logic
-	lowBypassBus3Button.setClickingTogglesState(true);
-	lowBypassBus3Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
-	addAndMakeVisible(lowBypassBus3Button);
-	lowBandBus3LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	lowBandBus3LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	lowBandBus3LevelSlider.setRange(0.0, 1.0, 0.001);
-	lowBandBus3LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+	auto& low2 = lowBandBus2LevelSlider.getSlider();
+	low2.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	low2.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	low2.setRange(0.0, 1.0, 0.001);
+	low2.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
 		juce::MathConstants<float>::pi * 3.25f,
 		true);
-	lowBandBus3LevelSlider.setLookAndFeel(&knob);
+
+	// Label style + percent formatting
+	lowBandBus2LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	lowBandBus2LevelSlider.setAsPercentKnob();
+
+	// Bus3 Logic
 	addAndMakeVisible(lowBandBus3LevelSlider);
+
+	auto& low3 = lowBandBus3LevelSlider.getSlider();
+	low3.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	low3.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	low3.setRange(0.0, 1.0, 0.001);
+	low3.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+		juce::MathConstants<float>::pi * 3.25f,
+		true);
+
+	// Label style + percent formatting
+	lowBandBus3LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	lowBandBus3LevelSlider.setAsPercentKnob();
 
 
 	//Apply Send Amount Based on Bypass State
@@ -139,13 +160,13 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(lowBand, 0, (float)lowBandBus1LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(lowBand, 0, (float)lowBandBus1LevelSlider.getSlider().getValue());
 
 			}
 
 		};
 
-	lowBandBus1LevelSlider.onValueChange = applyLowSend;
+	lowBandBus1LevelSlider.getSlider().onValueChange = applyLowSend;
 	lowBypassBus1Button.onClick = applyLowSend;
 
 	// Bus2 callback
@@ -157,10 +178,10 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(lowBand, 1, (float)lowBandBus2LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(lowBand, 1, (float)lowBandBus2LevelSlider.getSlider().getValue());
 			}
 		};
-	lowBandBus2LevelSlider.onValueChange = applyLowSend2;
+	lowBandBus2LevelSlider.getSlider().onValueChange = applyLowSend2;
 	lowBypassBus2Button.onClick = applyLowSend2;
 
 	// Bus3 callback
@@ -172,10 +193,10 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(lowBand, 2, (float)lowBandBus3LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(lowBand, 2, (float)lowBandBus3LevelSlider.getSlider().getValue());
 			}
 		};
-	lowBandBus3LevelSlider.onValueChange = applyLowSend3;
+	lowBandBus3LevelSlider.getSlider().onValueChange = applyLowSend3;
 	lowBypassBus3Button.onClick = applyLowSend3;
 #pragma endregion
 
@@ -194,40 +215,62 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	midBypassBus1Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(midBypassBus1Button);
 	//Knob
-	midBandBus1LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	midBandBus1LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	midBandBus1LevelSlider.setRange(0.0, 1.0, 0.001);
-	midBandBus1LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
-		juce::MathConstants<float>::pi * 3.25f,
-		true);
-	midBandBus1LevelSlider.setLookAndFeel(&knob);
 	addAndMakeVisible(midBandBus1LevelSlider);
 
+	auto& mid1 = midBandBus1LevelSlider.getSlider();
+	mid1.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	mid1.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	mid1.setRange(0.0, 1.0, 0.001);
+	mid1.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+		juce::MathConstants<float>::pi * 3.25f,
+		true);
+
+	// Label style + percent formatting
+	midBandBus1LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	midBandBus1LevelSlider.setAsPercentKnob();
+
 	// Bus2 Logic
+	//Button
 	midBypassBus2Button.setClickingTogglesState(true);
 	midBypassBus2Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(midBypassBus2Button);
-	midBandBus2LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	midBandBus2LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	midBandBus2LevelSlider.setRange(0.0, 1.0, 0.001);
-	midBandBus2LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
-		juce::MathConstants<float>::pi * 3.25f,
-		true);
-	midBandBus2LevelSlider.setLookAndFeel(&knob);
+	//Knob
 	addAndMakeVisible(midBandBus2LevelSlider);
 
+	auto& mid2 = midBandBus2LevelSlider.getSlider();
+	mid2.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	mid2.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	mid2.setRange(0.0, 1.0, 0.001);
+	mid2.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+		juce::MathConstants<float>::pi * 3.25f,
+		true);
+
+	// Label style + percent formatting
+	midBandBus2LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	midBandBus2LevelSlider.setAsPercentKnob();
+
 	// Bus3 Logic
+	//Button
 	midBypassBus3Button.setClickingTogglesState(true);
 	midBypassBus3Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(midBypassBus3Button);
-	midBandBus3LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	midBandBus3LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	midBandBus3LevelSlider.setRange(0.0, 1.0, 0.001);
-	midBandBus3LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+	//Knob
+	addAndMakeVisible(midBandBus3LevelSlider);
+
+	auto& mid3 = midBandBus3LevelSlider.getSlider();
+	mid3.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	mid3.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	mid3.setRange(0.0, 1.0, 0.001);
+	mid3.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
 		juce::MathConstants<float>::pi * 3.25f,
 		true);
-	midBandBus3LevelSlider.setLookAndFeel(&knob);
-	addAndMakeVisible(midBandBus3LevelSlider);
+
+	// Label style + percent formatting
+	midBandBus3LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	midBandBus3LevelSlider.setAsPercentKnob();
 
 	//Apply Send Amount Based on Bypass State
 	auto applyMidSend = [this, midBand]()
@@ -238,11 +281,11 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(midBand, 0, (float)midBandBus1LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(midBand, 0, (float)midBandBus1LevelSlider.getSlider().getValue());
 			}
 		};
 
-	midBandBus1LevelSlider.onValueChange = applyMidSend;
+	midBandBus1LevelSlider.getSlider().onValueChange = applyMidSend;
 	midBypassBus1Button.onClick = applyMidSend;
 
 	// Bus2 callback
@@ -254,10 +297,10 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(midBand, 1, (float)midBandBus2LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(midBand, 1, (float)midBandBus2LevelSlider.getSlider().getValue());
 			}
 		};
-	midBandBus2LevelSlider.onValueChange = applyMidSend2;
+	midBandBus2LevelSlider.getSlider().onValueChange = applyMidSend2;
 	midBypassBus2Button.onClick = applyMidSend2;
 
 	// Bus3 callback
@@ -269,10 +312,10 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(midBand, 2, (float)midBandBus3LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(midBand, 2, (float)midBandBus3LevelSlider.getSlider().getValue());
 			}
 		};
-	midBandBus3LevelSlider.onValueChange = applyMidSend3;
+	midBandBus3LevelSlider.getSlider().onValueChange = applyMidSend3;
 	midBypassBus3Button.onClick = applyMidSend3;
 #pragma endregion
 
@@ -291,40 +334,63 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	highBypassBus1Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(highBypassBus1Button);
 	//Knob
-	highBandBus1LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	highBandBus1LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	highBandBus1LevelSlider.setRange(0.0, 1.0, 0.001);
-	highBandBus1LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
-		juce::MathConstants<float>::pi * 3.25f,
-		true);
-	highBandBus1LevelSlider.setLookAndFeel(&knob);
 	addAndMakeVisible(highBandBus1LevelSlider);
 
+	auto& high1 = highBandBus1LevelSlider.getSlider();
+	high1.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	high1.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	high1.setRange(0.0, 1.0, 0.001);
+	high1.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+		juce::MathConstants<float>::pi * 3.25f,
+		true);
+
+	// Label style + percent formatting
+	highBandBus1LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	highBandBus1LevelSlider.setAsPercentKnob();
+
 	// Bus2 Logic
+	//Button
 	highBypassBus2Button.setClickingTogglesState(true);
 	highBypassBus2Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(highBypassBus2Button);
-	highBandBus2LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	highBandBus2LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	highBandBus2LevelSlider.setRange(0.0, 1.0, 0.001);
-	highBandBus2LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
-		juce::MathConstants<float>::pi * 3.25f,
-		true);
-	highBandBus2LevelSlider.setLookAndFeel(&knob);
+	//Knob
 	addAndMakeVisible(highBandBus2LevelSlider);
 
+	auto& high2 = highBandBus2LevelSlider.getSlider();
+	high2.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	high2.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	high2.setRange(0.0, 1.0, 0.001);
+	high2.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+		juce::MathConstants<float>::pi * 3.25f,
+		true);
+
+	// Label style + percent formatting
+	highBandBus2LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	highBandBus2LevelSlider.setAsPercentKnob();
+
+
 	// Bus3 Logic
+	//Button
 	highBypassBus3Button.setClickingTogglesState(true);
 	highBypassBus3Button.setImages(offImg, offHoverImg, onImg, onHoverImg);
 	addAndMakeVisible(highBypassBus3Button);
-	highBandBus3LevelSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-	highBandBus3LevelSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-	highBandBus3LevelSlider.setRange(0.0, 1.0, 0.001);
-	highBandBus3LevelSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
+	//Knob
+	addAndMakeVisible(highBandBus3LevelSlider);
+
+	auto& high3 = highBandBus3LevelSlider.getSlider();
+	high3.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+	high3.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	high3.setRange(0.0, 1.0, 0.001);
+	high3.setRotaryParameters(juce::MathConstants<float>::pi * 1.75f,
 		juce::MathConstants<float>::pi * 3.25f,
 		true);
-	highBandBus3LevelSlider.setLookAndFeel(&knob);
-	addAndMakeVisible(highBandBus3LevelSlider);
+
+	// Label style + percent formatting
+	highBandBus3LevelSlider.setLabelStyle(pluginLookAndFeel.getPixelFont(14.0f),
+		pluginLookAndFeel.uiTextColour);
+	highBandBus3LevelSlider.setAsPercentKnob();
 
 	//Apply Send Amount Based on Bypass State
 	auto applyHighSend = [this, highBand]()
@@ -335,11 +401,11 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(highBand, 0, (float)highBandBus1LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(highBand, 0, (float)highBandBus1LevelSlider.getSlider().getValue());
 			}
 		};
 
-	highBandBus1LevelSlider.onValueChange = applyHighSend;
+	highBandBus1LevelSlider.getSlider().onValueChange = applyHighSend;
 	highBypassBus1Button.onClick = applyHighSend;
 
 	// Bus2 callback
@@ -351,10 +417,10 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(highBand, 1, (float)highBandBus2LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(highBand, 1, (float)highBandBus2LevelSlider.getSlider().getValue());
 			}
 		};
-	highBandBus2LevelSlider.onValueChange = applyHighSend2;
+	highBandBus2LevelSlider.getSlider().onValueChange = applyHighSend2;
 	highBypassBus2Button.onClick = applyHighSend2;
 
 	// Bus3 callback
@@ -366,25 +432,22 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			}
 			else
 			{
-				audioProcessor.setBandSendAmount(highBand, 2, (float)highBandBus3LevelSlider.getValue());
+				audioProcessor.setBandSendAmount(highBand, 2, (float)highBandBus3LevelSlider.getSlider().getValue());
 			}
 		};
-	highBandBus3LevelSlider.onValueChange = applyHighSend3;
+	highBandBus3LevelSlider.getSlider().onValueChange = applyHighSend3;
 	highBypassBus3Button.onClick = applyHighSend3;
 #pragma endregion
 
 #pragma region BandSplitControls
 	//Band Split Controls Components
 
-	/*addAndMakeVisible(bandSplitKeyboard);*/
+	addAndMakeVisible(bandSplitKeyboard);
 
 	bandSplitSlider.setSliderStyle(juce::Slider::TwoValueHorizontal);
-	bandSplitSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 20);
-
-	// frequency range (pick what makes sense)
-
-	//Later add an option to switch to full range 0-127 MIDI control, which isn't as applicable in most cases
-	bandSplitSlider.setRange(24.0, 108.0, 1.0);
+	bandSplitSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+	//73 Key length, E1 to E7
+	bandSplitSlider.setRange(28.0, 100.0f, 1.0);
 	bandSplitSlider.setMinAndMaxValues(48.0, 72.0);
 	addAndMakeVisible(bandSplitSlider);
 
@@ -396,7 +459,7 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			return 440.0f * std::pow(2.0f, (midiNote - 69.0f) / 12.0f);
 		};
 
-	auto pushSplitsToProcessor = [this, &midiToHz]()
+	auto pushSplitsToProcessor = [this, midiToHz]()
 		{
 			const double lo = bandSplitSlider.getMinValue();
 			const double hi = bandSplitSlider.getMaxValue();
@@ -404,25 +467,32 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 		};
 
 	bandSplitSlider.onValueChange = [this, &midiToHz, pushSplitsToProcessor, minGapSemis]()
+	{
+		auto lo = bandSplitSlider.getMinValue();
+		auto hi = bandSplitSlider.getMaxValue();
+
+		if (hi < lo + minGapSemis)
 		{
-			auto lo = bandSplitSlider.getMinValue();
-			auto hi = bandSplitSlider.getMaxValue();
+			const auto thumb = bandSplitSlider.getThumbBeingDragged();
 
-			if (hi < lo + minGapSemis)
-    {
-        const auto thumb = bandSplitSlider.getThumbBeingDragged();
+			if (thumb == 1) // min thumb
+				lo = hi - minGapSemis;
+			else
+				hi = lo + minGapSemis;
 
-        if (thumb == bandSplitSlider.getMinimum())
-            lo = hi - minGapSemis;
-        else
-            hi = lo + minGapSemis;
+			bandSplitSlider.setMinAndMaxValues(lo, hi, juce::dontSendNotification);
+		}
+				
+		
+		if (auto* p = apvts.getParameter("lowMidCrossoverMidi"))
+			p->setValueNotifyingHost((p->convertTo0to1((float)lo)));
 
-        // write back without triggering recursion
-        bandSplitSlider.setMinAndMaxValues(lo, hi, juce::dontSendNotification);
-    }
+		if (auto* p = apvts.getParameter("midHighCrossoverMidi"))
+			p->setValueNotifyingHost((p->convertTo0to1((float)hi)));
 
-    pushSplitsToProcessor();
-		};
+		//Prints out the AVPTS values for debugging
+		pushSplitsToProcessor();
+	};
 
 #pragma endregion
 
@@ -535,13 +605,70 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	// Refresh once background scan finishes
 	startTimerHz(2);
 
+
 #pragma endregion
+
+#pragma region MidiDisplay
+	//Initialize MIDI Display Button
+	addAndMakeVisible(midiDisplayButton);
+
+	midiDisplayButton.setImages(
+		false, true, true,
+		midiDisplayOnImg, 1.0f, juce::Colours::transparentBlack,
+		midiDisplayOnHoverImg, 1.0f, juce::Colours::transparentBlack,
+		midiDisplayOnHoverImg, 1.0f, juce::Colours::transparentBlack
+	);
+
+	//Creates Midi Display Panel
+	midiDisplay = std::make_unique<MidiDisplay>(apvts);
+	addAndMakeVisible(*midiDisplay);
+	midiDisplay->setVisible(false);
+
+	//Set MIDI Display close button images
+	midiDisplay->setCloseButtonImages(
+		midiDisplayOffImg, midiDisplayOffHoverImg, midiDisplayOffHoverImg
+	);
+
+	// Close Callback for MIDI Display
+	midiDisplay->onRequestClose = [this]()
+		{
+			if (midiDisplay == nullptr)
+				return;
+
+			midiDisplay->setVisible(false);
+			midiDisplay->setEnabled(false);
+			midiDisplay->setAlwaysOnTop(false);
+		};
+
+	midiDisplayButton.onClick = [this]()
+		{
+			if (midiDisplay == nullptr)
+				return;
+
+			const bool show = !midiDisplay->isVisible();
+			midiDisplay->setVisible(show);
+			midiDisplay->setEnabled(show);
+
+			if (show)
+			{
+				midiDisplay->setBounds(getLocalBounds());
+				midiDisplay->setAlwaysOnTop(true);
+				midiDisplay->toFront(true);
+				midiDisplay->grabKeyboardFocus();
+				midiDisplay->repaint();
+			}
+		
+		};
+
+#pragma endregion
+
 
 #pragma endregion 
 }
 
 XPulseAudioProcessorEditor::~XPulseAudioProcessorEditor()
 {
+	setLookAndFeel(nullptr);
 }
 
 //==============================================================================
@@ -551,16 +678,16 @@ void XPulseAudioProcessorEditor::paint (juce::Graphics& g)
     //g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 	g.fillAll(juce::Colour(245, 230, 204));
     g.setColour (juce::Colour(245, 230, 204));
-    g.setFont (juce::FontOptions (15.0f));
+    /*g.setFont (juce::FontOptions (15.0f));*/
+	g.setFont(getPixelFont(12.0f));
 
-    
 }
 
 //Component Layout
 void XPulseAudioProcessorEditor::resized()
 {
 	// Layout the four band group components as three even vertical sections and one bottom section
-	const int bottomHeight = 150;
+	const int bottomHeight = 250;
 	const int bandWidth = getWidth() / 3;
 	const int bandHeight = getHeight() - bottomHeight;
 
@@ -569,6 +696,15 @@ void XPulseAudioProcessorEditor::resized()
 	highBandGroup.setBounds(2 * bandWidth, 0, getWidth() - 2 * bandWidth, bandHeight);
 	bandSplitControlsGroup.setBounds(0, bandHeight, getWidth(), bottomHeight);
 
+	// Position MIDI Display Button
+	midiDisplayButton.setBounds(getWidth() - 60, 10, 50, 50);
+	if (midiDisplay != nullptr) {
+		midiDisplay->setBounds(getLocalBounds());
+		if (midiDisplay->isVisible())
+			midiDisplay->toFront(false);
+
+	}
+	
 	// Low Band Components
 	lowBypassButton.setBounds(10, 30, 100, 30);
 
@@ -620,9 +756,12 @@ void XPulseAudioProcessorEditor::resized()
 	}
 
 	// Band Split Controls Components
-	//bandSplitKeyboard.setBounds(10, bandHeight + 20, getWidth(), bottomHeight);
+	//KeyBoard, Currently just for show, concept only
+	
 
-	bandSplitSlider.setBounds(10, bandHeight + 20, getWidth(), bottomHeight);
+	bandSplitKeyboard.setBounds(10, bandHeight + 125, getWidth(), bottomHeight - 35);
+
+	bandSplitSlider.setBounds(75, bandHeight + 20, getWidth() - 150, bottomHeight - 100);
 
 	
 }
@@ -697,6 +836,12 @@ void XPulseAudioProcessorEditor::timerCallback()
 		//rebuildPluginListFromHost();
 		stopTimer();
 	}
+
+	// Get the latest velocity from the processor
+	int velocity = audioProcessor.lowBandVelocity.load();
+
+	// Update Components with Velocity
+
 }
 
 #pragma endregion

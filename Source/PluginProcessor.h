@@ -42,9 +42,9 @@ public:
     
     //Custom Variables
     //MIDI Band Velocities
-	int lowBandVelocity = 0;
-	int midBandVelocity = 0;
-	int highBandVelocity = 0;
+	std::atomic<int> lowBandVelocity = 0;
+	std::atomic<int> midBandVelocity = 0;
+	std::atomic<int> highBandVelocity = 0;
     
 
     //==============================================================================
@@ -140,6 +140,9 @@ private:
 
 	//Host Processor Instance
     HostProcessor hostProcessor_; 
+
+    //Dirty Flag
+    std::atomic<bool> crossoverDirty{ true };
 
 	// ======== DSP processors ========
 	//Gain processor

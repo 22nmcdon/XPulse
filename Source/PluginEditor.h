@@ -15,6 +15,9 @@
 #include "SpectralMorphFXEditor.h"
 #include "TextureBlendFXEditor.h"
 #include "BandPluginSlot.h"
+#include "BinaryData.h"
+#include "MidiDisplay.h"
+#include "RotaryLabelKnob.h"   
 
 class HostProcessor;
 //==============================================================================
@@ -37,6 +40,16 @@ public:
 	void rebuildPluginListFromHost();
 
 private:
+	// Fonts
+	static juce::Font getPixelFont(float height)
+	{
+		static juce::Typeface::Ptr tf =
+			juce::Typeface::createSystemTypefaceFor(BinaryData::ARCADECLASSIC_TTF,
+				BinaryData::ARCADECLASSIC_TTFSize);
+
+		return juce::Font(tf).withHeight(height);
+	}
+
 	void timerCallback() override;
 
 	void openPluginEditorWindowForBand(int band);
@@ -71,40 +84,6 @@ private:
 		private:
 			juce::Image offNormal, offHover, onNormal, onHover;
 		};
-
-	// Rotating Knob
-	struct RotatingImageKnob : public juce::LookAndFeel_V4
-	{
-		juce::Image knobImg;
-
-		void drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
-			float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
-			juce::Slider&) override
-		{
-			if (!knobImg.isValid())
-				return;
-
-			// Make a square destination centered in the slider bounds
-			const int size = juce::jmin(w, h);
-			auto dest = juce::Rectangle<float>((float)x, (float)y, (float)w, (float)h)
-				.withSizeKeepingCentre((float)size, (float)size);
-
-			const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
-
-			// Rotate around image center, then scale to dest, then move to dest center
-			juce::AffineTransform t =
-				juce::AffineTransform::translation(-knobImg.getWidth() * 0.5f,
-					-knobImg.getHeight() * 0.5f)
-				.rotated(angle)
-				.scaled(dest.getWidth() / (float)knobImg.getWidth(),
-					dest.getHeight() / (float)knobImg.getHeight())
-				.translated(dest.getCentreX(), dest.getCentreY());
-
-			g.drawImageTransformed(knobImg, t);
-		}
-	};
-	RotatingImageKnob knob;
-
 	// Keyboard Component: Band-Separation UI
 	// Spans from E1 to E7 as a 73-key keyboard using MIDI 28-100
 	// Involves Two Split-Points to create Three Bands
@@ -119,45 +98,247 @@ private:
 		{
 			// Load the keyboard image
 			keyboardImage = juce::ImageFileFormat::loadFrom(BinaryData::KeyBoard_png, BinaryData::KeyBoard_pngSize);
-			
-			// Default splitPoints
-			lowBandSplit = 52;  // E3
-			highBandSplit = 76; // E5
+
+
 		}
 		void paint(juce::Graphics& g) override
 		{
 			// Draw the keyboard image
 			g.drawImageWithin(keyboardImage, 0, 0, getWidth(), getHeight(), juce::RectanglePlacement::centred);
 
-			// Draw overlays for split points
-			drawSplitOverlay(g, lowBandSplit);
-			drawSplitOverlay(g, highBandSplit);
 
-			// Optionally, highlight bands
-			// drawBandHighlight(g, ...);
 		}
 		void mouseDown(const juce::MouseEvent& event) override
 		{
 			// Convert mouse position to MIDI key and update split points
 			// (Implement logic based on image layout)
+
+			//This is not Implemented, for future works
 		}
 	private:
 		juce::Image keyboardImage;
-		int lowBandSplit;   // MIDI key for low-mid split
-		int highBandSplit;  // MIDI key for mid-high split
 
-		void drawSplitOverlay(juce::Graphics& g, int midiKey)
-		{
-			// Calculate x position for the split key
-			float keyWidth = getWidth() / 73.0f;
-			int keyIndex = midiKey - 21;
-			float x = keyIndex * keyWidth;
-			g.setColour(juce::Colours::red);
-			g.drawLine(x, 0, x, getHeight(), 2.0f);
-		}
 	};
 
 	#pragma endregion
+
+    struct PluginLookAndFeel : public juce::LookAndFeel_V4
+    {
+        PluginLookAndFeel()
+        {
+            //  Images 
+            knobImg = juce::ImageCache::getFromMemory(BinaryData::Knob_png, BinaryData::Knob_pngSize);
+
+            rightThumbOn = juce::ImageCache::getFromMemory(BinaryData::SliderRightOn_png, BinaryData::SliderRightOn_pngSize);
+            rightThumbOff = juce::ImageCache::getFromMemory(BinaryData::SliderRightOff_png, BinaryData::SliderRightOff_pngSize);
+            leftThumbOn = juce::ImageCache::getFromMemory(BinaryData::SliderLeftOn_png, BinaryData::SliderLeftOn_pngSize);
+            leftThumbOff = juce::ImageCache::getFromMemory(BinaryData::SliderLeftOff_png, BinaryData::SliderLeftOff_pngSize);
+            sliderBar = juce::ImageCache::getFromMemory(BinaryData::SliderBar_png, BinaryData::SliderBar_pngSize);
+
+            // Font 
+            typeface = juce::Typeface::createSystemTypefaceFor(
+                BinaryData::ARCADECLASSIC_TTF,
+                BinaryData::ARCADECLASSIC_TTFSize);
+        }
+
+		// Font Helper Function  
+        juce::Font getPixelFont(float height) const
+        {
+            if (typeface != nullptr)
+                return juce::Font(typeface).withHeight(height);
+
+            return juce::Font(height);
+        }
+
+		// Custom Colors
+        juce::Colour uiTextColour = juce::Colour::fromRGB(138, 0, 0);
+
+        juce::Label* createSliderTextBox(juce::Slider& slider) override
+        {
+            auto* l = juce::LookAndFeel_V4::createSliderTextBox(slider);
+
+            // Font + text colour
+            l->setFont(getPixelFont(14.0f));
+            l->setColour(juce::Label::textColourId, uiTextColour);
+
+            // Background + outline (tweak as you like)
+            l->setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
+            l->setColour(juce::Label::outlineColourId, juce::Colours::transparentBlack);
+
+            // Center the text
+            l->setJustificationType(juce::Justification::centred);
+
+            // If you want display-only (no typing), keep this:
+            l->setEditable(false, false, false);
+
+            // If you want the user to type values, comment out the line above.
+
+            return l;
+        }
+
+
+        void drawGroupComponentOutline(juce::Graphics& g,
+            int width, int height,
+            const juce::String& text,
+            const juce::Justification& position,
+            juce::GroupComponent& group) override
+        {
+            // Border
+            g.setColour(juce::Colours::white.withAlpha(0.7f)); // adjust to taste
+            const int textH = 18;                                // space reserved for title
+            g.drawRect(0, textH / 2, width, height - textH / 2);
+
+            // Title text
+            g.setColour(uiTextColour);
+
+            // Use your pixel font helper
+            g.setFont(getPixelFont(14.0f));
+
+            // Give the title a little padding so it doesn't sit on the border
+            auto titleArea = juce::Rectangle<int>(8, 0, width - 16, textH);
+            g.drawText(text, titleArea, position, true);
+        }
+        // Knob 
+        void drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
+            float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
+            juce::Slider& slider) override
+        {
+            // If this isn't one of your image knobs, fallback to default
+            if (!knobImg.isValid())
+            {
+                juce::LookAndFeel_V4::drawRotarySlider(g, x, y, w, h, sliderPos, rotaryStartAngle, rotaryEndAngle, slider);
+                return;
+            }
+
+            const int size = juce::jmin(w, h);
+            auto dest = juce::Rectangle<float>((float)x, (float)y, (float)w, (float)h)
+                .withSizeKeepingCentre((float)size, (float)size);
+
+            const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+
+            juce::AffineTransform t =
+                juce::AffineTransform::translation(-knobImg.getWidth() * 0.5f,
+                    -knobImg.getHeight() * 0.5f)
+                .rotated(angle)
+                .scaled(dest.getWidth() / (float)knobImg.getWidth(),
+                    dest.getHeight() / (float)knobImg.getHeight())
+                .translated(dest.getCentreX(), dest.getCentreY());
+
+            g.drawImageTransformed(knobImg, t);
+        }
+
+        // Band split slider 
+        static float midiToHz(float midiNote)
+        {
+            return 440.0f * std::pow(2.0f, (midiNote - 69.0f) / 12.0f);
+        }
+
+        static juce::String midiToNoteName(int midiNote)
+        {
+            static const char* flatNames[] = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
+
+            midiNote = juce::jlimit(0, 127, midiNote);
+
+            const int noteIndex = midiNote % 12;
+            const int octave = (midiNote / 12) - 1; // 60 -> C4 (common convention)
+
+            return juce::String(flatNames[noteIndex]) + juce::String(octave);
+        }
+
+        void drawLinearSlider(juce::Graphics& g,
+            int x, int y, int width, int height,
+            float sliderPos, float minSliderPos, float maxSliderPos,
+            const juce::Slider::SliderStyle style, juce::Slider& slider) override
+        {
+            // Only custom-draw your TwoValueHorizontal range slider. Everything else falls back.
+            if (style != juce::Slider::TwoValueHorizontal)
+            {
+                juce::LookAndFeel_V4::drawLinearSlider(g, x, y, width, height,
+                    sliderPos, minSliderPos, maxSliderPos,
+                    style, slider);
+                return;
+            }
+
+            const float thumbW = 32.0f;
+            const float thumbH = 32.0f;
+            const float thumbHalf = thumbW * 0.5f;
+            const float trackH = 8.0f;
+
+            const float trackLeft = (float)x + thumbHalf;
+            const float trackRight = (float)x + (float)width - thumbHalf;
+            const float trackW = trackRight - trackLeft;
+
+            const float trackY = (float)y + ((float)height - trackH) * 0.5f;
+
+            const float minX = juce::jlimit(trackLeft, trackRight, minSliderPos);
+            const float maxX = juce::jlimit(trackLeft, trackRight, maxSliderPos);
+
+            // bar
+            if (sliderBar.isValid())
+                g.drawImage(sliderBar, trackLeft, trackY, trackW, trackH, 0, 0, sliderBar.getWidth(), sliderBar.getHeight());
+            else
+                g.fillRoundedRectangle(trackLeft, trackY, trackW, trackH, trackH * 0.5f);
+
+            // thumbs
+            const float thumbY = (float)y + ((float)height - thumbH) * 0.5f;
+
+            const int thumb = slider.getThumbBeingDragged();
+            const bool draggingMin = (thumb == 1);
+            const bool draggingMax = (thumb == 2);
+
+            const auto& leftImg = draggingMin ? leftThumbOn : leftThumbOff;
+            const auto& rightImg = draggingMax ? rightThumbOn : rightThumbOff;
+
+            auto drawThumb = [&](const juce::Image& img, float centerX)
+                {
+                    const float drawX = centerX - thumbHalf;
+
+                    if (img.isValid())
+                        g.drawImage(img, drawX, thumbY, thumbW, thumbH, 0, 0, img.getWidth(), img.getHeight());
+                    else
+                        g.fillEllipse(drawX, thumbY, thumbW, thumbH);
+                };
+
+            drawThumb(leftImg, minX);
+            drawThumb(rightImg, maxX);
+
+            // labels
+            const float loMidi = (float)slider.getMinValue();
+            const float hiMidi = (float)slider.getMaxValue();
+
+            const juce::String loText = midiToNoteName((int)loMidi);
+            const juce::String hiText = midiToNoteName((int)hiMidi);
+
+            g.setColour(uiTextColour);
+            g.setFont(getPixelFont(12.0f));
+
+            const float labelW = 70.0f;
+            const float labelH = 14.0f;
+            const float labelGap = 2.0f;
+            const float labelY = thumbY - labelH - labelGap;
+
+            auto drawLabelCenteredAt = [&](float centerX, const juce::String& text)
+                {
+                    float lx = centerX - (labelW * 0.5f);
+                    lx = juce::jlimit((float)x, (float)x + (float)width - labelW, lx);
+
+                    g.drawFittedText(text, (int)lx, (int)labelY, (int)labelW, (int)labelH,
+                        juce::Justification::centred, 1);
+                };
+
+            drawLabelCenteredAt(minX, loText);
+            drawLabelCenteredAt(maxX, hiText);
+        }
+
+        // assets 
+        juce::Image knobImg;
+
+        juce::Image rightThumbOn, rightThumbOff;
+        juce::Image leftThumbOn, leftThumbOff;
+        juce::Image sliderBar;
+
+        juce::Typeface::Ptr typeface;
+    };
 
 	#pragma region BandPluginSlots
 
@@ -188,33 +369,37 @@ private:
 
 	// Bypass buttons and rotary knobs for 3 slots per band
 	TwoStateHoverButton lowBypassBus1Button{};
-	juce::Slider lowBandBus1LevelSlider;
+    RotaryLabelKnob lowBandBus1LevelSlider;
 	TwoStateHoverButton lowBypassBus2Button{};
-	juce::Slider lowBandBus2LevelSlider;
+    RotaryLabelKnob lowBandBus2LevelSlider;
 	TwoStateHoverButton lowBypassBus3Button{};
-	juce::Slider lowBandBus3LevelSlider;
+    RotaryLabelKnob lowBandBus3LevelSlider;
 
+    // MIDI Controls Panel
+    std::unique_ptr<MidiDisplay> midiDisplay;
+	juce::ImageButton midiDisplayButton;
+    
 	// MidBand components
 	TwoStateHoverButton midBypassButton{};
 	std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> midBandGainAttachment;
 
 	TwoStateHoverButton midBypassBus1Button{};
-	juce::Slider midBandBus1LevelSlider;
+    RotaryLabelKnob midBandBus1LevelSlider;
 	TwoStateHoverButton midBypassBus2Button{};
-	juce::Slider midBandBus2LevelSlider;
+    RotaryLabelKnob midBandBus2LevelSlider;
 	TwoStateHoverButton midBypassBus3Button{};
-	juce::Slider midBandBus3LevelSlider;
+    RotaryLabelKnob midBandBus3LevelSlider;
 
 	// HighBand components
 	TwoStateHoverButton highBypassButton{};
 	std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> highBandGainAttachment;
 
 	TwoStateHoverButton highBypassBus1Button{};
-	juce::Slider highBandBus1LevelSlider;
+    RotaryLabelKnob highBandBus1LevelSlider;
 	TwoStateHoverButton highBypassBus2Button{};
-	juce::Slider highBandBus2LevelSlider;
+    RotaryLabelKnob highBandBus2LevelSlider;
 	TwoStateHoverButton highBypassBus3Button{};
-	juce::Slider highBandBus3LevelSlider;
+    RotaryLabelKnob highBandBus3LevelSlider;
 
 
 	// Band Split Keyboard
@@ -222,10 +407,13 @@ private:
 	
 	juce::Slider bandSplitSlider{};
 
+	//LookAndFeel
+	PluginLookAndFeel pluginLookAndFeel;
 
 	//Audio Processor Reference
 	juce::AudioProcessorValueTreeState& apvts;
     XPulseAudioProcessor& audioProcessor;
+
 
 	
 

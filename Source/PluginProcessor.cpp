@@ -236,25 +236,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout XPulseAudioProcessor::create
 
 	//Band Split Frequencies
     auto hzRange = juce::NormalisableRange<float>(20.0f, 20000.0f);
-    hzRange.setSkewForCentre(1000.0f); //Centre
+    hzRange.setSkewForCentre(1000.0f); 
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>("lowMidCrossover", "Low-Mid Crossover", hzRange, 250.0f));
-
     params.push_back(std::make_unique<juce::AudioParameterFloat>("midHighCrossover", "Mid-High Crossover", hzRange, 4000.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("lowMidCrossoverMidi","Low-Mid Crossover MIDI",juce::NormalisableRange<float>(28.0f, 100.0f, 1.0f),48.0f)); 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("midHighCrossoverMidi","Mid-High Crossover MIDI",juce::NormalisableRange<float>(28.0f, 100.0f, 1.0f),72.0f));
 
+    // MIDI send paramters
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "lowVelToSend", "Low Band Vel To Send", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "midVelToSend", "Mid Band Vel To Send", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "highVelToSend", "High Band Vel To Send", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
 	//Return the parameter layout
 	return { params.begin(), params.end() };
 }
 
 //Audio Processing Function
-void XPulseAudioProcessor::processAudio(juce::AudioBuffer<float>& buffer) {
+void XPulseAudioProcessor::processAudio(juce::AudioBuffer<float>& buffer)
+{
+    //Dirty Flag
+    if (crossoverDirty.exchange(false, std::memory_order_acq_rel))
+    {
+        updateBandFilterCutoffs();
+    }
+
 	pitchDependent(buffer);
 }
 
 //MIDI Processing Function
-void XPulseAudioProcessor::processMidi(juce::MidiBuffer& midiMessages) {
-    
+void XPulseAudioProcessor::processMidi(juce::MidiBuffer& midiMessages) 
+{
+	pitchDependent(midiMessages);
 }
 
 #pragma region PitchDependentProcessing
@@ -371,25 +387,40 @@ void XPulseAudioProcessor::setBandSplits(float lowMidHz, float midHighHz)
         p2->setValueNotifyingHost(ranged->convertTo0to1(midHighHz));
         p2->endChangeGesture();
     }
-	updateBandFilterCutoffs();
+
+    //Dirty Flag
+    crossoverDirty.store(true, std::memory_order_release);
+
+	//updateBandFilterCutoffs();
 }
 
 
 
-//Pitch Dependent Processing MIDI
-void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages) {
+// Overloaded Pitch Dependent Processing for MIDI
+void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages)
+{
 	juce::MidiBuffer lowMidi, midMidi, highMidi;
-    
+
+	//Gets the crossover frequencies from the parameters to determine how to split the MIDI messages into bands
+	float lowMidMidi = *parameters.getRawParameterValue("lowMidCrossoverMidi");
+	float midHighMidi = *parameters.getRawParameterValue("midHighCrossoverMidi");
+
+    if (midiMessages.isEmpty()) {
+		return; // No MIDI messages to process
+    }
+
     for (const auto metadata : midiMessages) {
         const auto msg = metadata.getMessage();
         if (msg.isNoteOnOrOff()) {
             int note = msg.getNoteNumber();
-            if (note < 48) // Example: C2 and below = Low band
+			DBG("Note: " << note);
+
+            if (note < lowMidMidi)
                 lowMidi.addEvent(msg, metadata.samplePosition);
-            else if (note < 78) // Example: C2-E5 = Mid band
-                midMidi.addEvent(msg, metadata.samplePosition);
-            else // F5 and above = High band
+            else if (note > midHighMidi)
                 highMidi.addEvent(msg, metadata.samplePosition);
+            else 
+                midMidi.addEvent(msg, metadata.samplePosition);
         }
         else {
             // Non-note messages go to all bands, or handle as needed
@@ -409,86 +440,76 @@ void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages) {
     midiMessages.addEvents(midMidi, 0, -1, 0);
     midiMessages.addEvents(highMidi, 0, -1, 0);
 }
-void XPulseAudioProcessor::processLowBand(juce::MidiBuffer& midiMessages) {
-	float totalVelocity = 0.0f;
-    int length = 0;
+void XPulseAudioProcessor::processLowBand(juce::MidiBuffer& midiMessages)
+{
+    int highVelocity = 0; // 0..127
+
+    juce::MidiBuffer filtered;
+    filtered.ensureSize(midiMessages.getNumEvents());
+
+    for (const auto metadata : midiMessages)
+    {
+        const auto msg = metadata.getMessage();
+
+        if (msg.isNoteOn())
+        {
+            const int vel127 = juce::jlimit(0, 127, (int)std::lround(msg.getVelocity() * 127.0f));
+            highVelocity = juce::jmax(highVelocity, vel127);
+
+            // Keep the note-on (optional; depends if you want to pass MIDI through)
+            filtered.addEvent(msg, metadata.samplePosition);
+        }
+        else
+        {
+            filtered.addEvent(msg, metadata.samplePosition);
+        }
+    }
+
+    midiMessages.swapWith(filtered);
+
+    lowBandVelocity.store(highVelocity, std::memory_order_relaxed);
+}
+void XPulseAudioProcessor::processMidBand(juce::MidiBuffer& midiMessages) 
+{
+    float highVelocity = 0.0f;
+
     for (const auto metadata : midiMessages) {
         const auto msg = metadata.getMessage();
-        if (msg.isNoteOn()) {
-			//Multipied by 127 to convert from 0.0-1.0 to 0-127 MIDI velocity range
-			float velocity = msg.getVelocity() * 127;
-			totalVelocity += velocity;
-            length += 1;
+        if (msg.isNoteOn())
+        {
+            //Multipied by 127 to convert from 0.0-1.0 to 0-127 MIDI velocity range
+            if (msg.getVelocity() * 127 > highVelocity)
+            {
+                highVelocity = msg.getVelocity() * 127;
+            }
         }
         else {
             // Non-note and Non-note on messages remain unchanged
             midiMessages.addEvent(msg, metadata.samplePosition);
         }
-	}
-    if (length > 0) {
-        lowBandVelocity = int(totalVelocity / length);
     }
-
-	//Here I will check Parameters For Velocity Based FX Modulation
-	//This will be based on User Parameters set in the GUI
-    
-    //Reverb:
-	//This will work by modyfing th Gain value for the wet signal based on the average velocity of the notes in the band
-	//The Dry signal will remain unchanged
+    midBandVelocity = highVelocity;
 }
-void XPulseAudioProcessor::processMidBand(juce::MidiBuffer& midiMessages) {
-    float totalVelocity = 0.0f;
-    int length = 0;
+void XPulseAudioProcessor::processHighBand(juce::MidiBuffer& midiMessages)
+{
+    float highVelocity = 0.0f;
+
     for (const auto metadata : midiMessages) {
         const auto msg = metadata.getMessage();
-        // Example: Transpose down an octave for low band
-        if (msg.isNoteOn()) {
+        if (msg.isNoteOn())
+        {
             //Multipied by 127 to convert from 0.0-1.0 to 0-127 MIDI velocity range
-            float velocity = msg.getVelocity() * 127;
-            totalVelocity += velocity;
-            length += 1;
+            if (msg.getVelocity() * 127 > highVelocity)
+            {
+                highVelocity = msg.getVelocity() * 127;
+            }
         }
         else {
-            // Non-note messages and Non-note onremain unchanged
+            // Non-note and Non-note on messages remain unchanged
             midiMessages.addEvent(msg, metadata.samplePosition);
         }
     }
-    if(length > 0) {
-        midBandVelocity = int(totalVelocity / length);
-    }
-    //Here I will check Parameters For Velocity Based FX Modulation
-    //This will be based on User Parameters set in the GUI
-       
-    //Reverb:
-    //This will work by modyfing th Gain value for the wet signal based on the average velocity of the notes in the band
-    //The Dry signal will remain unchanged
-}
-void XPulseAudioProcessor::processHighBand(juce::MidiBuffer& midiMessages) {
-    float totalVelocity = 0.0f;
-    int length = 0;
-    for (const auto metadata : midiMessages) {
-        const auto msg = metadata.getMessage();
-        // Example: Transpose down an octave for low band
-        if (msg.isNoteOn()) {
-            //Multipied by 127 to convert from 0.0-1.0 to 0-127 MIDI velocity range
-            float velocity = msg.getVelocity() * 127;
-            totalVelocity += velocity;
-            length += 1;
-        }
-        else {
-            // Non-note and Non=note on messages remain unchanged
-            midiMessages.addEvent(msg, metadata.samplePosition);
-        }
-    }
-    if (length > 0) {
-        highBandVelocity = int(totalVelocity / length);
-    }
-    //Here I will check Parameters For Velocity Based FX Modulation
-    //This will be based on User Parameters set in the GUI
-
-    //Reverb:
-    //This will work by modyfing th Gain value for the wet signal based on the average velocity of the notes in the band
-    //The Dry signal will remain unchanged
+    highBandVelocity = highVelocity;
 }
 #pragma endregion
 
@@ -531,26 +552,15 @@ void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec
 
 void XPulseAudioProcessor::updateBandFilterCutoffs()
 {
-    if (currentSampleRate <= 0.0)
-    {
-        DBG("[XPulse] currentSampleRate is invalid: " + juce::String(currentSampleRate));
-        return;
-    }
 
     auto* pLo = parameters.getRawParameterValue("lowMidCrossover");
     auto* pHi = parameters.getRawParameterValue("midHighCrossover");
 
-
-    if (pLo == nullptr || pHi == nullptr)
-    {
-        DBG("[XPulse] Crossover parameter pointers are null");
-        return;
-    }
-
+    
     float lo = *pLo;
     float hi = *pHi;
 
-   
+
     // Clamp to safe range AND nyquist-safe range
     const float nyquistSafe = (float)(0.49 * currentSampleRate);
     lo = juce::jlimit(20.0f, nyquistSafe, lo);
@@ -564,23 +574,12 @@ void XPulseAudioProcessor::updateBandFilterCutoffs()
     auto& midHP = midBand.get<0>();
     auto& midLP = midBand.get<1>();
 
-    if (lowBand.state == nullptr || midHP.state == nullptr || midLP.state == nullptr || highBand.state == nullptr)
-    {
-        DBG("[XPulse] One or more filter state pointers are null!");
-        DBG("  lowBand.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)lowBand.state.get()));
-        DBG("  midHP.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)midHP.state.get()));
-        DBG("  midLP.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)midLP.state.get()));
-        DBG("  highBand.state: " + juce::String::toHexString((juce::uint64)(uintptr_t)highBand.state.get()));
-        return;
-    }
+    // IMPORTANT: overwrite existing coefficients, don’t swap pointers
+    *lowBand.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, lo);
+    *midHP.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, lo);
+    *midLP.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, hi);
+    *highBand.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, hi);
 
-    DBG("[XPulse] updateBandFilterCutoffs: sampleRate=" + juce::String(currentSampleRate) + ", lo=" + juce::String(lo) + ", hi=" + juce::String(hi));
-
-    // IMPORTANT: swap pointer, don't mutate *state in place
-    lowBand.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, lo);
-    midHP.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, lo);
-    midLP.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, hi);
-    highBand.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, hi);
 }
 
 
