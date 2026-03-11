@@ -130,6 +130,26 @@ void XPulseAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     midBuffer.setSize(numCh, samplesPerBlock);
     highBuffer.setSize(numCh, samplesPerBlock);
     auxBuffer.setSize(numCh, samplesPerBlock);
+
+    for (int b = 0; b < 3; ++b)
+    {
+        for (int s = 0; s < 3; ++s)
+        {
+            sendSmooth[b][s].reset(sampleRate, 0.02); // 20ms smoothing applies below as well
+            sendSmooth[b][s].setCurrentAndTargetValue(0.0f);
+        }
+    }
+
+    for (int b = 0; b < 3; ++b)
+    {
+        velSmooth[b].reset(sampleRate, 0.02);
+        velSmooth[b].setCurrentAndTargetValue(0.5f);
+    }
+    for (int b = 0; b < 3; ++b)
+    {
+        pedalSendSmooth[b].reset(sampleRate, 0.02);
+        pedalSendSmooth[b].setCurrentAndTargetValue(0.0f);
+    }
 	
 }
 
@@ -389,14 +409,15 @@ void XPulseAudioProcessor::setBandSplits(float lowMidHz, float midHighHz)
     }
 
     //Dirty Flag
-    crossoverDirty.store(true, std::memory_order_release);
+    //crossoverDirty.store(true, std::memory_order_release);
 
-	//updateBandFilterCutoffs();
+	updateBandFilterCutoffs();
 }
 
 
 
 // Overloaded Pitch Dependent Processing for MIDI
+
 void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages)
 {
 	juce::MidiBuffer lowMidi, midMidi, highMidi;
@@ -409,8 +430,15 @@ void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages)
 		return; // No MIDI messages to process
     }
 
-    for (const auto metadata : midiMessages) {
+
+    for (const auto metadata : midiMessages) 
+    {
         const auto msg = metadata.getMessage();
+
+        //Pedal messages & others
+        if (msg.isController() && msg.getControllerNumber() == 64)
+            sustainDown.store(msg.getControllerValue() >= 64, std::memory_order_relaxed);
+
         if (msg.isNoteOnOrOff()) {
             int note = msg.getNoteNumber();
 			DBG("Note: " << note);
@@ -421,12 +449,6 @@ void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages)
                 highMidi.addEvent(msg, metadata.samplePosition);
             else 
                 midMidi.addEvent(msg, metadata.samplePosition);
-        }
-        else {
-            // Non-note messages go to all bands, or handle as needed
-            lowMidi.addEvent(msg, metadata.samplePosition);
-            midMidi.addEvent(msg, metadata.samplePosition);
-            highMidi.addEvent(msg, metadata.samplePosition);
         }
     }
 
@@ -442,7 +464,7 @@ void XPulseAudioProcessor::pitchDependent(juce::MidiBuffer& midiMessages)
 }
 void XPulseAudioProcessor::processLowBand(juce::MidiBuffer& midiMessages)
 {
-    int highVelocity = 0; // 0..127
+    int highVelocity = 0;
 
     juce::MidiBuffer filtered;
     filtered.ensureSize(midiMessages.getNumEvents());
@@ -456,7 +478,6 @@ void XPulseAudioProcessor::processLowBand(juce::MidiBuffer& midiMessages)
             const int vel127 = juce::jlimit(0, 127, (int)std::lround(msg.getVelocity() * 127.0f));
             highVelocity = juce::jmax(highVelocity, vel127);
 
-            // Keep the note-on (optional; depends if you want to pass MIDI through)
             filtered.addEvent(msg, metadata.samplePosition);
         }
         else
@@ -471,45 +492,93 @@ void XPulseAudioProcessor::processLowBand(juce::MidiBuffer& midiMessages)
 }
 void XPulseAudioProcessor::processMidBand(juce::MidiBuffer& midiMessages) 
 {
-    float highVelocity = 0.0f;
+    int highVelocity = 0;
 
-    for (const auto metadata : midiMessages) {
+    juce::MidiBuffer filtered;
+    filtered.ensureSize(midiMessages.getNumEvents());
+
+    for (const auto metadata : midiMessages)
+    {
         const auto msg = metadata.getMessage();
+
         if (msg.isNoteOn())
         {
-            //Multipied by 127 to convert from 0.0-1.0 to 0-127 MIDI velocity range
-            if (msg.getVelocity() * 127 > highVelocity)
-            {
-                highVelocity = msg.getVelocity() * 127;
-            }
+            const int vel127 = juce::jlimit(0, 127, (int)std::lround(msg.getVelocity() * 127.0f));
+            highVelocity = juce::jmax(highVelocity, vel127);
+
+            filtered.addEvent(msg, metadata.samplePosition);
         }
-        else {
-            // Non-note and Non-note on messages remain unchanged
-            midiMessages.addEvent(msg, metadata.samplePosition);
+        else
+        {
+            filtered.addEvent(msg, metadata.samplePosition);
         }
     }
-    midBandVelocity = highVelocity;
+
+    midiMessages.swapWith(filtered);
+
+    midBandVelocity.store(highVelocity, std::memory_order_relaxed);
 }
 void XPulseAudioProcessor::processHighBand(juce::MidiBuffer& midiMessages)
 {
-    float highVelocity = 0.0f;
+    int highVelocity = 0;
 
-    for (const auto metadata : midiMessages) {
+    juce::MidiBuffer filtered;
+    filtered.ensureSize(midiMessages.getNumEvents());
+
+    for (const auto metadata : midiMessages)
+    {
         const auto msg = metadata.getMessage();
+
         if (msg.isNoteOn())
         {
-            //Multipied by 127 to convert from 0.0-1.0 to 0-127 MIDI velocity range
-            if (msg.getVelocity() * 127 > highVelocity)
-            {
-                highVelocity = msg.getVelocity() * 127;
-            }
+            const int vel127 = juce::jlimit(0, 127, (int)std::lround(msg.getVelocity() * 127.0f));
+            highVelocity = juce::jmax(highVelocity, vel127);
+
+            filtered.addEvent(msg, metadata.samplePosition);
         }
-        else {
-            // Non-note and Non-note on messages remain unchanged
-            midiMessages.addEvent(msg, metadata.samplePosition);
+        else
+        {
+            filtered.addEvent(msg, metadata.samplePosition);
         }
     }
-    highBandVelocity = highVelocity;
+
+    midiMessages.swapWith(filtered);
+
+    highBandVelocity.store(highVelocity, std::memory_order_relaxed);
+}
+
+float XPulseAudioProcessor::getVelocitySendMultiplier(int band) const
+{
+    // Read velToSend parameter for the band (0..1, where 0.5 is neutral)
+    const float velToSend =
+        (band == 0 ? *parameters.getRawParameterValue("lowVelToSend") :
+            band == 1 ? *parameters.getRawParameterValue("midVelToSend") :
+            *parameters.getRawParameterValue("highVelToSend"));
+
+    // Read last velocity for the band (0..127)
+    const int vel127 =
+        (band == 0 ? (int)lowBandVelocity.load(std::memory_order_relaxed) :
+            band == 1 ? (int)midBandVelocity.load(std::memory_order_relaxed) :
+            (int)highBandVelocity.load(std::memory_order_relaxed));
+
+    float velNorm = juce::jlimit(0.0f, 1.0f, vel127 / 127.0f);
+
+    // gamma > 1 emphasizes extremities
+    const float gamma = 2.2f;
+    velNorm = std::pow(velNorm, gamma);
+
+    // a lower pivot increases the amount of high range vs low range
+    const float pivot = 0.35f;
+    float centered = (velNorm - pivot) / (1.0f - pivot); 
+    centered = centered * 2.0f - 1.0f;
+    const float depth = (velToSend - 0.5f) * 2.0f;
+
+    
+
+    float mult = 1.0f + centered * depth;                              
+    mult = juce::jlimit(0.0f, 2.0f, mult);
+
+    return mult;
 }
 #pragma endregion
 
@@ -548,7 +617,6 @@ void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec
     midBand.reset();
     highBand.reset();
 }
-
 
 void XPulseAudioProcessor::updateBandFilterCutoffs()
 {
@@ -615,11 +683,13 @@ void XPulseAudioProcessor::processHostedSends(juce::AudioBuffer<float>& low,
 
             usedIds[numUsed++] = id;
         };
-
+	// Gather unique instance IDs across all bandSlot routes
     for (int band = 0; band < kNumBands; ++band)
         for (int slot = 0; slot < kNumSlots; ++slot)
             pushUnique((PluginPool::InstanceId)bandPluginInstanceId[band][slot].load(std::memory_order_relaxed));
-
+	// Also include any instance IDs from pedal sends (if sustain is down)
+    for (int band = 0; band < 3; ++band)
+        pushUnique((PluginPool::InstanceId)pedalPluginInstanceId[band].load(std::memory_order_relaxed));
     // For each unique hosted instance, sum all sends targeting it, process once, then return to all targets.
     for (int u = 0; u < numUsed; ++u)
     {
@@ -634,15 +704,58 @@ void XPulseAudioProcessor::processHostedSends(juce::AudioBuffer<float>& low,
 
         // Sum sends from any band/slot that routes to this instance id
         auto sumSendFrom = [&](int bandIndex, int slotIndex, juce::AudioBuffer<float>& bandBuf)
+        {
+            const auto routedId =
+                (PluginPool::InstanceId)bandPluginInstanceId[bandIndex][slotIndex].load(std::memory_order_relaxed);
+
+            if (routedId != id)
+                return;
+
+            const float baseSend =
+                bandSendAmount[bandIndex][slotIndex].load(std::memory_order_relaxed);
+
+            if (baseSend <= 0.0001f)
+                return;
+
+            const float velMult = getVelocitySendMultiplier(bandIndex);
+            const float floor = 0.1f;
+            const float targetSend = juce::jlimit(baseSend * floor, 1.0f, baseSend * velMult);
+
+            auto& sm = sendSmooth[bandIndex][slotIndex];
+            sm.setTargetValue(targetSend);
+
+            //const float send = sm.getNextValue(); // one step per block
+
+            //if (send <= 0.0001f)
+            //    return;
+
+            for (int n = 0; n < numSamp; ++n)
+            {
+                const float g = sm.getNextValue();
+
+                for (int ch = 0; ch < numCh; ++ch)
+                    auxBuffer.setSample(ch, n,
+                        auxBuffer.getSample(ch, n) + bandBuf.getSample(ch, n) * g);
+            }
+        };
+
+        auto sumPedalFrom = [&](int bandIndex, juce::AudioBuffer<float>& bandBuf)
             {
                 const auto routedId =
-                    (PluginPool::InstanceId)bandPluginInstanceId[bandIndex][slotIndex].load(std::memory_order_relaxed);
+                    (PluginPool::InstanceId)pedalPluginInstanceId[bandIndex].load(std::memory_order_relaxed);
 
                 if (routedId != id)
                     return;
 
-                const float send =
-                    bandSendAmount[bandIndex][slotIndex].load(std::memory_order_relaxed);
+                float target = pedalSendAmount[bandIndex].load(std::memory_order_relaxed);
+                auto& sm = pedalSendSmooth[bandIndex];
+                sm.setTargetValue(target);
+
+                float send = sm.getNextValue(); // per-block smoothing
+
+                // Gate by sustain pedal
+                if (!sustainDown.load(std::memory_order_relaxed))
+                    send = 0.0f;
 
                 if (send <= 0.0001f)
                     return;
@@ -650,6 +763,11 @@ void XPulseAudioProcessor::processHostedSends(juce::AudioBuffer<float>& low,
                 for (int ch = 0; ch < numCh; ++ch)
                     auxBuffer.addFrom(ch, 0, bandBuf, ch, 0, numSamp, send);
             };
+
+        // add pedal sends
+        sumPedalFrom(0, low);
+        sumPedalFrom(1, mid);
+        sumPedalFrom(2, high);
 
         // Low band
         for (int slot = 0; slot < kNumSlots; ++slot)
@@ -685,7 +803,27 @@ void XPulseAudioProcessor::processHostedSends(juce::AudioBuffer<float>& low,
                 for (int ch = 0; ch < numCh; ++ch)
                     bandBuf.addFrom(ch, 0, auxBuffer, ch, 0, numSamp, ret);
             };
+       
+        auto returnPedalTo = [&](int bandIndex, juce::AudioBuffer<float>& bandBuf)
+            {
+                const auto routedId =
+                    (PluginPool::InstanceId)pedalPluginInstanceId[bandIndex].load(std::memory_order_relaxed);
 
+                if (routedId != id)
+                    return;
+
+                const float ret = pedalReturnAmount[bandIndex].load(std::memory_order_relaxed);
+                if (ret <= 0.0001f)
+                    return;
+
+                for (int ch = 0; ch < numCh; ++ch)
+                    bandBuf.addFrom(ch, 0, auxBuffer, ch, 0, numSamp, ret);
+            };
+
+        returnPedalTo(0, low);
+        returnPedalTo(1, mid);
+        returnPedalTo(2, high);
+        // Return Sends for each band and its corresponding slots
         for (int slot = 0; slot < kNumSlots; ++slot) returnTo(0, slot, low);
         for (int slot = 0; slot < kNumSlots; ++slot) returnTo(1, slot, mid);
         for (int slot = 0; slot < kNumSlots; ++slot) returnTo(2, slot, high);

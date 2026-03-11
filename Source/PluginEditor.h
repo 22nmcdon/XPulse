@@ -53,6 +53,7 @@ private:
 	void timerCallback() override;
 
 	void openPluginEditorWindowForBand(int band);
+
 	#pragma region Custom Components
 
 	// Two State Hover Button
@@ -356,6 +357,11 @@ private:
 	static int getSlotInBand(int slot) { return slot % slotsPerBand; }
 
 	#pragma endregion
+
+#pragma region PedalSlots
+    PluginPool::InstanceId pedalInstanceId[3]{ 0, 0, 0 };
+    std::unique_ptr<juce::DocumentWindow> pedalWindows[3];
+#pragma endregion
 
 	// Band group components
 	juce::GroupComponent lowBandGroup{ "lowBandGroup", "Low Band" };

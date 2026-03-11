@@ -3,12 +3,33 @@
 #include <JuceHeader.h>
 #include "RotaryLabelKnob.h"
 #include "BinaryData.h"
+#include "PluginProcessor.h"
+#include "BandPluginSlot.h"
 
 class MidiDisplay : public juce::Component
 {
 public:
-    MidiDisplay(juce::AudioProcessorValueTreeState& apvtsRef)
-        : apvts(apvtsRef)
+	// Helper Functions for pluginSlots callbacks
+    std::function<void(BandPluginSlot&)> onRequestPluginList;
+    std::function<void(int band, int slot, const juce::PluginDescription&)> onAddReplace;
+    std::function<void(int band, int slot)> onRemove;
+    std::function<void(int band, int slot)> onOpenEditor;
+    void setPedalSlotLoaded(int band, bool hasPlugin, const juce::String& name)
+    {
+        if (band < 0 || band >= 3) return;
+        pedalSlots[band].setHasPlugin(hasPlugin);
+        pedalSlots[band].setPluginName(name);
+    }
+    void setPedalSlotUnloaded(int band, bool hasPlugin)
+    {
+        if (band < 0 || band >= 3) return;
+        pedalSlots[band].setHasPlugin(false);
+        pedalSlots[band].setPluginName({});
+	}
+
+
+    MidiDisplay(XPulseAudioProcessor& processorRef, juce::AudioProcessorValueTreeState& apvtsRef)
+        : audioProcessor(processorRef), apvts(apvtsRef)
     {
         setInterceptsMouseClicks(true, true); 
         
@@ -49,10 +70,56 @@ public:
         setupVel(midVelKnob, midVelLabel, "Mid Velocity To Send");
         setupVel(highVelKnob, highVelLabel, "High Velocity To Send");
 
+		// Pedal Plugin Slot
+        for (int b = 0; b < 3; ++b)
+        {
+            pedalSlots[b].setBandIndex(b);
+			pedalSlots[b].setSlotIndex(99); // Dummy slot index since these are single-slot "bands"
+            addAndMakeVisible(pedalSlots[b]);
+
+            pedalSlotLabels[b].setInterceptsMouseClicks(false, false);
+            pedalSlotLabels[b].setJustificationType(juce::Justification::centred);
+            pedalSlotLabels[b].setFont(getPixelFont(14.0f));
+            pedalSlotLabels[b].setColour(juce::Label::textColourId, uiTextColour);
+            pedalSlotLabels[b].setText(b == 0 ? "Low Pedal FX" : b == 1 ? "Mid Pedal FX" : "High Pedal FX",
+                juce::dontSendNotification);
+            addAndMakeVisible(pedalSlotLabels[b]);
+        };
+        for (int b = 0; b < 3; ++b)
+        {
+            pedalSlots[b].onRequestRebuildMenuList = [this, b](int, int)
+                {
+                    if (onRequestPluginList) onRequestPluginList(pedalSlots[b]);
+                };
+
+            pedalSlots[b].onAddReplace = [this](int band, int slot, const juce::PluginDescription& desc)
+                {
+                    if (onAddReplace) onAddReplace(band, slot, desc);
+                };
+
+            pedalSlots[b].onRemove = [this](int band, int slot)
+                {
+                    if (onRemove) onRemove(band, slot);
+                };
+
+            pedalSlots[b].onOpenEditor = [this](int band, int slot)
+                {
+                    if (onOpenEditor) onOpenEditor(band, slot);
+                };
+        }
+
+
+
         // Attach to APVTS
         lowVelAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "lowVelToSend", lowVelKnob.getSlider());
         midVelAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "midVelToSend", midVelKnob.getSlider());
         highVelAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "highVelToSend", highVelKnob.getSlider());
+    }
+
+    void setPedalDown(bool down)
+    {
+        pedalDown = down;
+        repaint();
     }
 
     void setCloseButtonImages(const juce::Image& normal,
@@ -87,6 +154,13 @@ public:
         g.setColour(uiTextColour);
         g.setFont(getPixelFont(24.0f));
         g.drawText("MIDI Controls", bounds.removeFromTop(40), juce::Justification::centred);
+
+		//Pedal down indicator
+        g.setFont(getPixelFont(14.0f));
+        g.setColour(pedalDown ? juce::Colours::lime : juce::Colours::red);
+        g.drawText(pedalDown ? "SUSTAIN: ON" : "SUSTAIN: OFF",
+            getLocalBounds().removeFromTop(20),
+            juce::Justification::centred);
     }
 
     void resized() override
@@ -99,12 +173,12 @@ public:
         auto content = bounds.reduced(20);
 
         // 3 knobs in a row
-        auto row = content.removeFromTop(160);
-        auto w = row.getWidth() / 3;
+        auto velRow = content.removeFromTop(160);
+        auto velWidth = velRow.getWidth() / 3;
 
-        auto col1 = row.removeFromLeft(w);
-        auto col2 = row.removeFromLeft(w);
-        auto col3 = row;
+        auto col1 = velRow.removeFromLeft(velWidth);
+        auto col2 = velRow.removeFromLeft(velWidth);
+        auto col3 = velRow;
 
         lowVelKnob.setBounds(col1.removeFromTop(120).reduced(10));
         lowVelLabel.setBounds(col1.removeFromTop(30).reduced(10));
@@ -114,13 +188,35 @@ public:
 
         highVelKnob.setBounds(col3.removeFromTop(120).reduced(10));
         highVelLabel.setBounds(col3.removeFromTop(30).reduced(10));
+
+		//Pedal slots in a row
+        auto pedalRow = content.removeFromTop(120);
+        auto pedalWidth = pedalRow.getWidth() / 3;
+
+        for (int b = 0; b < 3; ++b)
+        {
+            auto col = pedalRow.removeFromLeft(pedalWidth).reduced(10);
+
+            pedalSlotLabels[b].setBounds(col.removeFromTop(20));
+            pedalSlots[b].setBounds(col.removeFromTop(30));
+        }
     }
 
     // Editor sets this
     std::function<void()> onRequestClose;
 
 private:
+    // Reference to main processor
+	XPulseAudioProcessor& audioProcessor;
 
+    // Pedal Boolean
+    bool pedalDown = false;
+
+	// Pedal Plugin Slots
+	BandPluginSlot pedalSlots[3]; 
+    juce::Label     pedalSlotLabels[3];
+    
+	// Helper to load our pixel font from BinaryData
     static juce::Font getPixelFont(float height)
     {
         static juce::Typeface::Ptr tf =

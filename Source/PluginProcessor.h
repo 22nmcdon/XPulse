@@ -93,39 +93,65 @@ public:
         if ((unsigned)band < kNumBands && (unsigned)slot < kNumSlots)
             bandPluginInstanceId[band][slot].store(id, std::memory_order_relaxed);
     }
-
     void setBandSendAmount(int band, int slot, float v)
     {
         if ((unsigned)band < kNumBands && (unsigned)slot < kNumSlots)
             bandSendAmount[band][slot].store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
     }
-
     void setBandReturnAmount(int band, int slot, float v)
     {
         if ((unsigned)band < kNumBands && (unsigned)slot < kNumSlots)
             bandReturnAmount[band][slot].store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
     }
     
-	// Band Splitter Functions
+	// PedalFX Send Functions
+    void setPedalPluginInstanceId(int band, uint32_t id) { pedalPluginInstanceId[band].store(id, std::memory_order_relaxed); }
+    void setPedalSendAmount(int band, float v) { pedalSendAmount[band].store(v, std::memory_order_relaxed); }
+    void setPedalReturnAmount(int band, float v) { pedalReturnAmount[band].store(v, std::memory_order_relaxed); }
+	
+    // Band Splitter Functions
     void setBandSplits(float lowMidSplit, float midHighSplit);
 
+	// Pedal State Functions
+    bool isSustainDown() const noexcept
+    {
+        return sustainDown.load(std::memory_order_relaxed);
+    }
+
 private:
+    // Pedal State
+    std::atomic<bool> sustainDown{ false };
+
 	// Default sample rate (will be updated in prepareToPlay)
     double currentSampleRate = 44100.0;
+
+    // Value Smoothing
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> sendSmooth[3][3];
+    juce::SmoothedValue<float> velSmooth[3];
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pedalSendSmooth[3];
 
 	// Function to update band filter coefficients based on current parameter values
     void updateBandFilterCutoffs();
 
-	// Constants for band processing
-	static constexpr int kNumBands = 3; // Low, Mid, High
-	static constexpr int kNumSlots = 3;
+    //
+    float getVelocitySendMultiplier(int band) const;
 
-    // Hosted plugin send routing
+	// Constants for band processing
+	static constexpr int kNumBands = 3;
+	static constexpr int kNumSlots = 3;
+    static constexpr int kPedalSlotsPerBand = 1; 
+
+    // Hosted plugin send routing for Bands
     std::atomic<uint32_t> bandPluginInstanceId[kNumBands][kNumSlots];
     std::atomic<float>    bandSendAmount[kNumBands][kNumSlots]; 
     std::atomic<float>    bandReturnAmount[kNumBands][kNumSlots];
 
+    // Hosted plugin send routing for PedalFX
+    std::atomic<uint32_t> pedalPluginInstanceId[kNumBands]{ 0, 0, 0 };
+	std::atomic<float>    pedalSendAmount[kNumBands]{ 0.8f, 0.8f, 0.8f }; //Set default send amount for PedalFX to 0.8f (80%)
+    std::atomic<float>    pedalReturnAmount[kNumBands]{ 1.0f, 1.0f, 1.0f };
     
+
     // buffers reused per block (no allocations in processBlock)
     juce::AudioBuffer<float> lowBuffer, midBuffer, highBuffer;
     juce::AudioBuffer<float> auxBuffer;

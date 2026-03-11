@@ -466,7 +466,7 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			audioProcessor.setBandSplits(midiToHz(lo), midiToHz(hi));
 		};
 
-	bandSplitSlider.onValueChange = [this, &midiToHz, pushSplitsToProcessor, minGapSemis]()
+	bandSplitSlider.onValueChange = [this, midiToHz, pushSplitsToProcessor, minGapSemis]()
 	{
 		auto lo = bandSplitSlider.getMinValue();
 		auto hi = bandSplitSlider.getMaxValue();
@@ -485,12 +485,17 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 				
 		
 		if (auto* p = apvts.getParameter("lowMidCrossoverMidi"))
-			p->setValueNotifyingHost((p->convertTo0to1((float)lo)));
+			p->setValueNotifyingHost(p->convertTo0to1((float)lo));
 
 		if (auto* p = apvts.getParameter("midHighCrossoverMidi"))
-			p->setValueNotifyingHost((p->convertTo0to1((float)hi)));
+			p->setValueNotifyingHost(p->convertTo0to1((float)hi));
 
-		//Prints out the AVPTS values for debugging
+		if (auto* p = apvts.getParameter("lowMidCrossover"))
+			p->setValueNotifyingHost(p->convertTo0to1((float)lo));
+
+		if (auto* p = apvts.getParameter("midHighCrossover"))
+			p->setValueNotifyingHost(p->convertTo0to1((float)hi));
+
 		pushSplitsToProcessor();
 	};
 
@@ -620,7 +625,7 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 	);
 
 	//Creates Midi Display Panel
-	midiDisplay = std::make_unique<MidiDisplay>(apvts);
+	midiDisplay = std::make_unique<MidiDisplay>(audioProcessor, apvts);
 	addAndMakeVisible(*midiDisplay);
 	midiDisplay->setVisible(false);
 
@@ -660,6 +665,82 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 		
 		};
 
+	//Pedal FX Slot Callbacks
+	midiDisplay->onRequestPluginList = [this](BandPluginSlot& slot)
+		{
+			rebuildPluginListFromHost();
+			slot.setPluginList(cachedDescs);		
+		};
+	midiDisplay->onAddReplace = [this](int band, int /*slot*/, const juce::PluginDescription& desc)
+		{
+
+			// close existing pedal window
+			pedalWindows[band].reset();
+
+			// destroy old pedal instance
+			if (pedalInstanceId[band] != 0)
+			{
+				audioProcessor.setPedalPluginInstanceId(band, 0);
+				audioProcessor.getHostProcessor().getPool().destroyInstance(pedalInstanceId[band]);
+				pedalInstanceId[band] = 0;
+			}
+
+			// create new
+			auto newId = audioProcessor.getHostProcessor().getPool().createInstance(desc);
+
+			if (newId == 0)
+				return;
+
+			pedalInstanceId[band] = newId;
+
+			// route into the *pedal* routing arrays (separate from main slots)
+			audioProcessor.setPedalPluginInstanceId(band, (uint32_t)newId);
+			if (midiDisplay)
+				midiDisplay->setPedalSlotLoaded(band, true, desc.name);
+			
+			
+		};
+	midiDisplay->onRemove = [this](int band, int /*slot*/)
+		{
+			if (pedalInstanceId[band] == 0)
+				return;
+
+			pedalWindows[band].reset();
+
+			audioProcessor.setPedalPluginInstanceId(band, 0);
+			audioProcessor.setPedalSendAmount(band, 0.0f);
+			audioProcessor.setPedalReturnAmount(band, 1.0f);
+
+			audioProcessor.getHostProcessor().getPool().destroyInstance(pedalInstanceId[band]);
+			pedalInstanceId[band] = 0;
+
+			if (midiDisplay)
+				midiDisplay->setPedalSlotUnloaded(band, false);
+
+		};
+	midiDisplay->onOpenEditor = [this](int band, int /*slot*/)
+		{
+			auto id = pedalInstanceId[band];
+			if (id == 0)
+				return;
+
+			if (pedalWindows[band])
+			{
+				pedalWindows[band]->setVisible(true);
+				pedalWindows[band]->toFront(true);
+				return;
+			}
+
+			auto& pool = audioProcessor.getHostProcessor().getPool();
+			auto ed = pool.createEditorFor(id);
+			if (!ed) return;
+
+			pedalWindows[band] = std::make_unique<HostedPluginWindow>(
+				ed->getName(),
+				std::move(ed),
+				[this, band]() { pedalWindows[band].reset(); }
+			);
+		};
 #pragma endregion
 
 
@@ -840,7 +921,8 @@ void XPulseAudioProcessorEditor::timerCallback()
 	// Get the latest velocity from the processor
 	int velocity = audioProcessor.lowBandVelocity.load();
 
-	// Update Components with Velocity
+	if (midiDisplay)
+		midiDisplay->setPedalDown(audioProcessor.isSustainDown());
 
 }
 
