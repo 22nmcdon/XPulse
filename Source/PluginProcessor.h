@@ -14,7 +14,7 @@
 //==============================================================================
 /**
 */
-class XPulseAudioProcessor  : public juce::AudioProcessor
+class XPulseAudioProcessor  : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
 	//Custom Prepare Functions
@@ -118,6 +118,9 @@ public:
         return sustainDown.load(std::memory_order_relaxed);
     }
 
+    // Parameter Change function
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
 private:
     // Pedal State
     std::atomic<bool> sustainDown{ false };
@@ -194,3 +197,4 @@ private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (XPulseAudioProcessor)
 };
+

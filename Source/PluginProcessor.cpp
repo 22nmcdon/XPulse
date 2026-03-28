@@ -33,10 +33,15 @@ XPulseAudioProcessor::XPulseAudioProcessor()
             bandReturnAmount[b][s].store(1.0f, std::memory_order_relaxed);
         }
     }
+
+    parameters.addParameterListener("lowMidCrossoverMidi", this);
+    parameters.addParameterListener("midHighCrossoverMidi", this);
 }
 
 XPulseAudioProcessor::~XPulseAudioProcessor()
 {
+    parameters.removeParameterListener("lowMidCrossoverMidi", this);
+    parameters.removeParameterListener("midHighCrossoverMidi", this);
 }
 
 //==============================================================================
@@ -254,14 +259,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout XPulseAudioProcessor::create
 	//Band Filters Cutoff Frequencies
     params.push_back(std::make_unique<juce::AudioParameterFloat>("cutoff", "Cutoff", 20.0f, 20000.0f, 1000.0f));
 
-	//Band Split Frequencies
-    auto hzRange = juce::NormalisableRange<float>(20.0f, 20000.0f);
-    hzRange.setSkewForCentre(1000.0f); 
+    // Band Split Positions in MIDI note numbers
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "lowMidCrossoverMidi",
+        "Low-Mid Crossover MIDI",
+        juce::NormalisableRange<float>(28.0f, 100.0f, 1.0f),
+        48.0f)); 
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("lowMidCrossover", "Low-Mid Crossover", hzRange, 250.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("midHighCrossover", "Mid-High Crossover", hzRange, 4000.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("lowMidCrossoverMidi","Low-Mid Crossover MIDI",juce::NormalisableRange<float>(28.0f, 100.0f, 1.0f),48.0f)); 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("midHighCrossoverMidi","Mid-High Crossover MIDI",juce::NormalisableRange<float>(28.0f, 100.0f, 1.0f),72.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "midHighCrossoverMidi",
+        "Mid-High Crossover MIDI",
+        juce::NormalisableRange<float>(28.0f, 100.0f, 1.0f),
+        72.0f));
 
     // MIDI send paramters
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -273,6 +282,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout XPulseAudioProcessor::create
 
 	//Return the parameter layout
 	return { params.begin(), params.end() };
+}
+
+void XPulseAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == "lowMidCrossoverMidi" || parameterID == "midHighCrossoverMidi")
+        crossoverDirty.store(true, std::memory_order_release);
 }
 
 //Audio Processing Function
@@ -335,6 +350,8 @@ void XPulseAudioProcessor::processLowBand(juce::AudioBuffer<float>& buffer) {
     //Build an AudioBlock and process it with the DSP processors
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
+
+
     lowBand.process(context);
 
     //Apply Gain 
@@ -378,42 +395,6 @@ void XPulseAudioProcessor::processHighBand(juce::AudioBuffer<float>& buffer) {
 
 
 }
-
-void XPulseAudioProcessor::setBandSplits(float lowMidHz, float midHighHz)
-{
-    lowMidHz = juce::jlimit(20.0f, 20000.0f, lowMidHz);
-    midHighHz = juce::jlimit(20.0f, 20000.0f, midHighHz);
-
-    const float minGapHz = 10.0f;
-    if (midHighHz < lowMidHz + minGapHz)
-        midHighHz = lowMidHz + minGapHz;
-
-    if (auto* p1 = parameters.getParameter("lowMidCrossover"))
-    {
-        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p1);
-        jassert(ranged);
-
-        p1->beginChangeGesture();
-        p1->setValueNotifyingHost(ranged->convertTo0to1(lowMidHz));
-        p1->endChangeGesture();
-    }
-
-    if (auto* p2 = parameters.getParameter("midHighCrossover"))
-    {
-        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(p2);
-        jassert(ranged);
-
-        p2->beginChangeGesture();
-        p2->setValueNotifyingHost(ranged->convertTo0to1(midHighHz));
-        p2->endChangeGesture();
-    }
-
-    //Dirty Flag
-    //crossoverDirty.store(true, std::memory_order_release);
-
-	updateBandFilterCutoffs();
-}
-
 
 
 // Overloaded Pitch Dependent Processing for MIDI
@@ -617,40 +598,50 @@ void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec
     midBand.reset();
     highBand.reset();
 }
-
 void XPulseAudioProcessor::updateBandFilterCutoffs()
 {
-
-    auto* pLo = parameters.getRawParameterValue("lowMidCrossover");
-    auto* pHi = parameters.getRawParameterValue("midHighCrossover");
-
     
-    float lo = *pLo;
-    float hi = *pHi;
+    auto* pLoMidi = parameters.getRawParameterValue("lowMidCrossoverMidi");
+    auto* pHiMidi = parameters.getRawParameterValue("midHighCrossoverMidi");
 
+    jassert(pLoMidi != nullptr);
+    jassert(pHiMidi != nullptr);
 
-    // Clamp to safe range AND nyquist-safe range
+    auto midiToHz = [](float midiNote) -> float
+        {
+            return 440.0f * std::pow(2.0f, (midiNote - 69.0f) / 12.0f);
+        };
+
+    float loMidi = *pLoMidi;
+    float hiMidi = *pHiMidi;
+
+    if (hiMidi < loMidi + 1.0f)
+        hiMidi = loMidi + 1.0f;
+
+    float lo = midiToHz(loMidi);
+    float hi = midiToHz(hiMidi);
+
+    /*float lo = 523.0f;
+    float hi = 2093.0f;*/
+
     const float nyquistSafe = (float)(0.49 * currentSampleRate);
     lo = juce::jlimit(20.0f, nyquistSafe, lo);
     hi = juce::jlimit(20.0f, nyquistSafe, hi);
 
-    // enforce ordering + gap
     const float minGapHz = 10.0f;
-    if (hi < lo + minGapHz) hi = juce::jmin(nyquistSafe, lo + minGapHz);
+    if (hi < lo + minGapHz)
+        hi = juce::jmin(nyquistSafe, lo + minGapHz);
 
-    // state pointers must exist
+
     auto& midHP = midBand.get<0>();
     auto& midLP = midBand.get<1>();
 
-    // IMPORTANT: overwrite existing coefficients, don’t swap pointers
+
     *lowBand.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, lo);
     *midHP.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, lo);
     *midLP.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(currentSampleRate, hi);
     *highBand.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(currentSampleRate, hi);
-
 }
-
-
 
 #pragma endregion
 

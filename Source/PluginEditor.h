@@ -412,6 +412,9 @@ private:
 	BandSplitKeyboard bandSplitKeyboard;//Not Implmented Yet
 	
 	juce::Slider bandSplitSlider{};
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowMidCrossoverAttachmentMidi;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> midHighCrossoverAttachmentMidi;
+
 
 	//LookAndFeel
 	PluginLookAndFeel pluginLookAndFeel;

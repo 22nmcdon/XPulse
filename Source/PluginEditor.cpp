@@ -459,30 +459,25 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 			return 440.0f * std::pow(2.0f, (midiNote - 69.0f) / 12.0f);
 		};
 
-	auto pushSplitsToProcessor = [this, midiToHz]()
-		{
-			const double lo = bandSplitSlider.getMinValue();
-			const double hi = bandSplitSlider.getMaxValue();
-			audioProcessor.setBandSplits(midiToHz(lo), midiToHz(hi));
-		};
-
-	bandSplitSlider.onValueChange = [this, midiToHz, pushSplitsToProcessor, minGapSemis]()
+	bandSplitSlider.onValueChange = [this, midiToHz, minGapSemis]()
 	{
 		auto lo = bandSplitSlider.getMinValue();
 		auto hi = bandSplitSlider.getMaxValue();
-
+		
 		if (hi < lo + minGapSemis)
 		{
 			const auto thumb = bandSplitSlider.getThumbBeingDragged();
 
-			if (thumb == 1) // min thumb
+			if (thumb == 1) 
 				lo = hi - minGapSemis;
 			else
 				hi = lo + minGapSemis;
 
 			bandSplitSlider.setMinAndMaxValues(lo, hi, juce::dontSendNotification);
 		}
-				
+		
+		const float loHz = midiToHz((float)lo);
+		const float hiHz = midiToHz((float)hi);
 		
 		if (auto* p = apvts.getParameter("lowMidCrossoverMidi"))
 			p->setValueNotifyingHost(p->convertTo0to1((float)lo));
@@ -490,13 +485,6 @@ XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& pro
 		if (auto* p = apvts.getParameter("midHighCrossoverMidi"))
 			p->setValueNotifyingHost(p->convertTo0to1((float)hi));
 
-		if (auto* p = apvts.getParameter("lowMidCrossover"))
-			p->setValueNotifyingHost(p->convertTo0to1((float)lo));
-
-		if (auto* p = apvts.getParameter("midHighCrossover"))
-			p->setValueNotifyingHost(p->convertTo0to1((float)hi));
-
-		pushSplitsToProcessor();
 	};
 
 #pragma endregion
