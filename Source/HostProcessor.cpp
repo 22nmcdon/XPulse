@@ -1,6 +1,11 @@
 #include <juce_core/juce_core.h>
 #include "HostProcessor.h"
 
+// This class is responsible for managing the audio processing and plugin hosting functionality of the application.
+// It maintains a pool of plugin instances, handles loading and unloading of plugins, and manages the known plugin list.
+// It also provides methods for preparing to play, processing audio blocks, and creating plugin editors. 
+// Additionally, it includes functionality for scanning for plugins in the background and saving/loading
+// the known plugin list to/from disk using JUCE's PropertiesFile system.
 HostProcessor::HostProcessor()
 	: pool(formatManager)
 {

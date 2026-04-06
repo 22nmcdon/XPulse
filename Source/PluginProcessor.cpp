@@ -1,15 +1,10 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
-
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-//==============================================================================
+// This is the constructor and destructor of the main processor class. 
+// The constructor also initialises the APVTS with the parameter layout defined in PluginProcessor.h, and adds listeners 
+// for the crossover parameters so that we can update the filter cutoffs when they change. 
+// The destructor removes these listeners to avoid dangling pointers.
 XPulseAudioProcessor::XPulseAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
@@ -578,7 +573,7 @@ void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec
 {
     currentSampleRate = spec.sampleRate;
 
-    // 1) set initial states FIRST (non-null)
+    // set initial states
     lowBand.state = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 250.0f);
 
     auto& midHP = midBand.get<0>();
@@ -588,12 +583,12 @@ void XPulseAudioProcessor::prepareBandFilters(const juce::dsp::ProcessSpec& spec
 
     highBand.state = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 4000.0f);
 
-    // 2) now prepare
+    // prepare
     lowBand.prepare(spec);
     midBand.prepare(spec);
     highBand.prepare(spec);
 
-    // 3) now reset
+    // reset
     lowBand.reset();
     midBand.reset();
     highBand.reset();

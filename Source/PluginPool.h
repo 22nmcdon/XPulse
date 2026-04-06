@@ -7,6 +7,9 @@
 #include <atomic>
 #include <vector>
 
+
+// This class is responsible for managing a pool of plugin instances
+
 class PluginPool
 {
 public:

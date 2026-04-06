@@ -1,6 +1,9 @@
 #pragma once
 #include <JuceHeader.h>
 
+// This component combines a rotary slider with a label that displays the current value as a percentage. 
+// It also uses a timer to ensure the label updates if the slider value changes.
+
 class RotaryLabelKnob : public juce::Component, private juce::Timer
 {
 public:

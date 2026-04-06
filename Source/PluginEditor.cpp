@@ -15,7 +15,10 @@
 #include "HostProcessor.h"
 #include "BinaryData.h"
 
-//Hosted Plugin Window Class
+// This extra class is used to create a separate window for hosting plugin editors when the user clicks the "MIDI" button in the band controls.
+// It inherits from DocumentWindow, which provides a standard window with a title bar and close button.
+// The window takes ownership of the plugin editor component and calls a provided callback function when the close button is pressed, 
+// allowing the owner to clean up resources appropriately.
 class HostedPluginWindow : public juce::DocumentWindow
 {
 public:
@@ -50,8 +53,9 @@ private:
 	std::function<void()> onClose;
 };
 
-
-//==============================================================================
+// This is the constructor for the main plugin editor class. It initializes the editor with a reference to the audio processor
+// and sets up the user interface components, including custom buttons and sliders for controlling the pitch-dependent effects. 
+// The constructor also loads custom images for the buttons and applies a custom look-and-feel to the editor.
 XPulseAudioProcessorEditor::XPulseAudioProcessorEditor(XPulseAudioProcessor& processorRef)
 	: AudioProcessorEditor(&processorRef), audioProcessor(processorRef), apvts(processorRef.parameters)
 {

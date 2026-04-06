@@ -1,11 +1,3 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
-
 #pragma once
 
 #include <JuceHeader.h>
@@ -19,10 +11,10 @@
 #include "MidiDisplay.h"
 #include "RotaryLabelKnob.h"   
 
+// This is the header file for the plugin editor, which defines the XPulseAudioProcessorEditor class 
+// and is responsible for the GUI componentes of the plugin
 class HostProcessor;
-//==============================================================================
-/**
-*/
+
 class XPulseAudioProcessorEditor  : public juce::AudioProcessorEditor,
 									private juce::Timer        
 {

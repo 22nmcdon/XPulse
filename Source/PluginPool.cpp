@@ -5,6 +5,10 @@
 // The audio thread only reads from the snapeshot atomic pointer, while the UI
 // thread can mutate the entries map and rebuild the snapshot as needed.
 
+// This class is responsible for managing a pool of plugin instances, allowing for creation, destruction, 
+// and access to plugins in a thread-safe manner. It maintains an internal map of plugin entries and provides 
+// a snapshot mechanism for the audio thread to access plugin instances without locking. 
+// The class also handles preparing plugins for playback and creating editors for the plugins.
 PluginPool::PluginPool(juce::AudioPluginFormatManager& fm)
     : formatManager(fm)
 {

@@ -7,6 +7,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginPool.h"
 
+// This class is responsible for managing the hosted plugin instance, including loading/unloading, processing audio/MIDI, 
+// and providing access to the plugin pool and known plugin list. It also handles scanning for plugins in the background and saving/loading state.
 class HostProcessor
 {
 public:

@@ -6,6 +6,8 @@
 #include "PluginProcessor.h"
 #include "BandPluginSlot.h"
 
+// This component is responsible for displaying MIDI-related controls and information, such as velocity knobs and pedal plugin slots.
+// It also provides callbacks for interactions with the pedal plugin slots, allowing the main editor to handle plugin management actions.
 class MidiDisplay : public juce::Component
 {
 public:

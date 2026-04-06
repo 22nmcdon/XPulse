@@ -5,7 +5,8 @@
 #include "PluginPool.h"
 #include "BinaryData.h"
 
-// A single slot: shows current plugin name, click -> popup to add/remove/open editor
+// This class is responsible for the BandPluginSlot component, which represents a single slot in the band plugin list.
+// It displays the plugin name (or "-None-" if empty) and shows a menu when clicked to add/replace/remove plugins or open the editor.
 class BandPluginSlot : public juce::Component
 {
 public:

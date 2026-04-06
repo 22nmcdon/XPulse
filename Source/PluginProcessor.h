@@ -1,19 +1,10 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
-
 #pragma once
 
 #include <JuceHeader.h>
 #include "HostProcessor.h"
 
-//==============================================================================
-/**
-*/
+// This is the header file for the plugin processor, which defines the XPulseAudioProcessor class and is responsible for the audio and MIDI processing of the plugin. 
+// It also includes functions for handling parameter changes and communication with the host processor.
 class XPulseAudioProcessor  : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
