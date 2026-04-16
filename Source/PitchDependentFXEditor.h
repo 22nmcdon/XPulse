@@ -5,6 +5,7 @@
 #include "MidBandWindow.h"
 #include "LowBandWindow.h"
 #include "PluginProcessor.h"
+//Deprecated
 
 
 class PitchDependentFXEditor : public juce::DocumentWindow

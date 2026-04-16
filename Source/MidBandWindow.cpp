@@ -1,5 +1,6 @@
 #include "MidBandWindow.h"
 #include "PluginProcessor.h"
+//Deprecated
 
 
 MidBandWindow::MidBandWindow(XPulseAudioProcessor& processorRef, juce::AudioProcessorValueTreeState& apvts)

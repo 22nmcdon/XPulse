@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+//Deprecated
 
 class TextureBlendFXEditor : public juce::DocumentWindow
 {

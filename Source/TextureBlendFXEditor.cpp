@@ -1,4 +1,5 @@
 #include "TextureBlendFXEditor.h"
+//Deprecated
 
 TextureBlendFXEditor::TextureBlendFXEditor(juce::AudioProcessorValueTreeState& apvts)
     : juce::DocumentWindow("Texture Blend FX Editor", juce::Colours::lightgrey, juce::DocumentWindow::allButtons)

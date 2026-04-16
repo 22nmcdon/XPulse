@@ -1,4 +1,5 @@
 #include "SpectralMorphFXContent.h"
+//Deprecated
 
 SpectralMorphFXContent::SpectralMorphFXContent(juce::AudioProcessorValueTreeState& apvts)
 {

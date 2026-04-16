@@ -1,5 +1,6 @@
 #include "HighBandWindow.h"
 #include "PluginProcessor.h"
+//Deprecated
 
 HighBandWindow::HighBandWindow(XPulseAudioProcessor &processorRef, juce::AudioProcessorValueTreeState& apvts)
 	: processorRef(processorRef), apvtsRef(apvts)

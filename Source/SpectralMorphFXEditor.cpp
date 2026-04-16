@@ -1,4 +1,5 @@
 #include "SpectralMorphFXEditor.h"
+//Deprecated
 
 SpectralMorphFXEditor::SpectralMorphFXEditor(juce::AudioProcessorValueTreeState& apvts)
     : juce::DocumentWindow("Spectral Morph FX Editor", juce::Colours::lightgrey, juce::DocumentWindow::allButtons)

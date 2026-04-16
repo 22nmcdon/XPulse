@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-
+//Deprecated
 
 class MidBandWindow : public juce::Component
 {

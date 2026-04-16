@@ -4,6 +4,7 @@
 #include "HighBandWindow.h"
 #include "PluginProcessor.h"
 
+//Deprecated
 
 
 PitchDependentFXContent::PitchDependentFXContent(XPulseAudioProcessor& processorRef, juce::AudioProcessorValueTreeState& apvts) 

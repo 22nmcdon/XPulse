@@ -1,4 +1,5 @@
 #include "PerformanceFXEditor.h"
+//Deprecated
 
 PerformanceFXEditor::PerformanceFXEditor(juce::AudioProcessorValueTreeState& apvts)
     : juce::DocumentWindow("Performance FX Editor", juce::Colours::lightgrey, juce::DocumentWindow::allButtons)

@@ -1,6 +1,7 @@
 #include "PitchDependentFXEditor.h"
 #include "PitchDependentFXContent.h"
 #include "PluginProcessor.h"
+//Deprecated
 
 PitchDependentFXEditor::PitchDependentFXEditor(XPulseAudioProcessor& processorRef, juce::AudioProcessorValueTreeState& apvts)
     : juce::DocumentWindow("Pitch Dependent FX Editor", juce::Colours::lightgrey, juce::DocumentWindow::allButtons)

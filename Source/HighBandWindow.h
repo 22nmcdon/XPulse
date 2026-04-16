@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+//Deprecated
 
 
 class HighBandWindow : public juce::Component

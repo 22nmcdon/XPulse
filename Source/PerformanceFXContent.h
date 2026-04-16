@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 
+//Deprecated
+
 class PerformanceFXContent : public juce::Component
 {
 public:

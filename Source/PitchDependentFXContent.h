@@ -5,6 +5,7 @@
 #include "HighBandWindow.h"
 #include "PluginProcessor.h"
 
+//Deprecated
 
 class PitchDependentFXContent : public juce::Component
 {

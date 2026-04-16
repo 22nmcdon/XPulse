@@ -9,3 +9,4 @@
 */
 
 #include "BandPluginSlot.h"
+//Deprecated
